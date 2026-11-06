@@ -1,4 +1,4 @@
-using GitHub.Copilot;
+using CopilotLib;
 using Spectre.Console;
 
 namespace CodeAssistant.TUI
@@ -8,7 +8,7 @@ namespace CodeAssistant.TUI
         /// <summary>Invoked before a prompt so pending assistant output can be rendered first.</summary>
         public static Action? BeforePrompt { get; set; }
 
-        public static Task<UserInputResponse> HandleAsync(UserInputRequest request, UserInputInvocation invocation)
+        public static Task<UserInputAnswer> HandleAsync(UserInputQuestion request)
         {
             BeforePrompt?.Invoke();
 
@@ -18,11 +18,11 @@ namespace CodeAssistant.TUI
                 .BorderColor(Color.Yellow)
                 .RoundedBorder());
 
-            List<string> choices = request.Choices is { Count: > 0 } ? [.. request.Choices] : [];
+            List<string> choices = [.. request.Choices];
             if (choices.Count > 0)
             {
                 const string other = "Other (type an answer)";
-                if (request.AllowFreeform ?? true)
+                if (request.AllowFreeform)
                 {
                     choices.Add(other);
                 }
@@ -30,12 +30,12 @@ namespace CodeAssistant.TUI
                 string selected = AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(choices));
                 if (selected != other)
                 {
-                    return Task.FromResult(new UserInputResponse { Answer = selected, WasFreeform = false });
+                    return Task.FromResult(new UserInputAnswer(selected, false));
                 }
             }
 
             string answer = AnsiConsole.Prompt(new TextPrompt<string>("[bold cyan]Answer>[/]").AllowEmpty());
-            return Task.FromResult(new UserInputResponse { Answer = answer, WasFreeform = true });
+            return Task.FromResult(new UserInputAnswer(answer, true));
         }
     }
 }

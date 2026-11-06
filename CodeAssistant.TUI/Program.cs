@@ -30,7 +30,7 @@ namespace CodeAssistant.TUI
             {
                 options.EnableBuiltInTools = true;
                 options.WorkingDirectory = Environment.CurrentDirectory;
-                options.PermissionHandler = PermissionHandler.ApproveAll;
+                options.ApproveAllPermissions = true;
                 options.UserInputHandler = UserInputPrompt.HandleAsync;
             });
 
@@ -73,6 +73,8 @@ namespace CodeAssistant.TUI
             AnsiConsole.MarkupLine("[grey]Type [bold]exit[/] to quit.[/]");
             AnsiConsole.WriteLine();
 
+            await using ILLMSession session = await llm.CreateSessionAsync(cancellationToken: exit.Token);
+
             while (!exit.IsCancellationRequested)
             {
                 string input;
@@ -97,7 +99,7 @@ namespace CodeAssistant.TUI
 
                 try
                 {
-                    await StreamReplyAsync(llm, input,cancellationToken: exit.Token);
+                    await StreamReplyAsync(session, input, exit.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -117,7 +119,7 @@ namespace CodeAssistant.TUI
             AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
         }
 
-        private static async Task StreamReplyAsync(ILLMService llm, string input, string? sessionId = null, CancellationToken cancellationToken = default)
+        private static async Task StreamReplyAsync(ILLMSession session, string input, CancellationToken cancellationToken = default)
         {
             AnsiConsole.Write(new Rule("[bold green]Assistant[/]") { Justification = Justify.Left, Style = Style.Parse("green") });
             AnsiConsole.Markup("[grey italic]Thinking...[/]");
@@ -152,7 +154,7 @@ namespace CodeAssistant.TUI
             UserInputPrompt.BeforePrompt = Flush;
             try
             {
-                await foreach (string chunk in llm.AskStreamingAsync(input, sessionId: sessionId, cancellationToken: cancellationToken))
+                await foreach (string chunk in session.AskStreamingAsync(input, cancellationToken: cancellationToken))
                 {
                     lock (pending)
                     {

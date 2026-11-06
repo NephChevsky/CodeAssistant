@@ -17,3 +17,6 @@ TestResults/
 ## OS
 Thumbs.db
 .DS_Store
+
+## Local NuGet config
+nuget.config
