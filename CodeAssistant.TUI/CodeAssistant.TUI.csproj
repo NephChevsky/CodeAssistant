@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="BoxOfYellow.ConsoleMarkdownRenderer.Spectre" Version="0.12.6" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
-    <PackageReference Include="Neph.GenericLibs.Net.CopilotLib" Version="0.3.1" />
+    <PackageReference Include="Neph.GenericLibs.Net.CopilotLib" Version="0.3.0" />
     <PackageReference Include="Neph.GenericLibs.Net.SerilogLib" Version="0.1.1" />
     <PackageReference Include="Spectre.Console" Version="0.57.2" />
   </ItemGroup>
