@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
-using CodeAssistant.Lib;
 using CodeAssistant.Lib.Planning;
 using CodeAssistant.Lib.Tools;
 using CopilotLib;
@@ -21,7 +20,6 @@ namespace CodeAssistant.TUI
     {
         private const string ProductionMode = "Production mode";
         private const string FullControlMode = "Full control";
-        private const string PlanFeatureMode = "Plan feature";
         internal const int AssistantPrefixWidth = 11;
         private const string SonnetModel = "claude-sonnet-5.5";
         private const string OpusModel = "claude-opus-5.5";
@@ -52,12 +50,6 @@ namespace CodeAssistant.TUI
             builder.Logging.ClearProviders();
             builder.UseSerilogLib(writeToConsole: false);
             builder.Services.AddCopilotLib();
-            builder.Services.AddCodeAssistantLib(options =>
-            {
-                options.RepositoryRoot = null;
-                options.Model = model;
-                options.ReasoningEffort = reasoningEffort;
-            });
 
             using IHost host = builder.Build();
             await using ILLMService llm = host.Services.GetRequiredService<ILLMService>();
@@ -69,15 +61,8 @@ namespace CodeAssistant.TUI
             AnsiConsole.MarkupLine("[grey]Type [bold]exit[/] to quit.[/]");
             AnsiConsole.WriteLine();
 
-            if (mode == PlanFeatureMode)
-            {
-                await PlanningConsole.RunAsync(host.Services.GetRequiredService<IFeaturePlanner>(), exit.Token);
-            }
-            else
-            {
-                IReadOnlyList<AIFunction> tools = ReadOnlyRepositoryTools.Create(new RepositorySandbox(null, []), host.Services.GetRequiredService<PlannerOptions>());
-                await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, tools, exit.Token);
-            }
+            IReadOnlyList<AIFunction> tools = ReadOnlyRepositoryTools.Create(new RepositorySandbox(null, []), new PlannerOptions());
+            await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, tools, exit.Token);
 
             AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
         }
@@ -250,7 +235,7 @@ namespace CodeAssistant.TUI
         {
             return AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("[bold]Select a mode:[/]")
-                .AddChoices(ProductionMode, FullControlMode, PlanFeatureMode));
+                .AddChoices(ProductionMode, FullControlMode));
         }
 
         private static string PromptForModel()
