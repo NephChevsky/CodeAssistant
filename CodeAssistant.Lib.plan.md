@@ -12,57 +12,57 @@ The machine-readable version of this plan (same shape as the future `FeaturePlan
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T0.1 | Add `bool RestrictToCustomTools { get; init; }` to `LLMSessionOptions` (`D:\dev\GenericLibs.Net\LLMs\LLMLib\ILLMSession.cs`); bump LLMLib to 0.3.0 (additive, non-breaking). | — |
-| T0.2 | In `CopilotService.GetSessionAsync`, when the flag is set: `AvailableTools = ["web_fetch", ..customToolNames]` and use the restrictive permission handler (public URLs + caller custom tools only) even if `EnableBuiltInTools`/`ApproveAllPermissions` are on. Bump CopilotLib to 0.6.0, reference LLMLib 0.3.0. | T0.1 |
-| T0.3 | `dotnet pack` LLMLib and CopilotLib into `D:\dev\GenericLibs.Net\local-nuget-feed` (already a source in [nuget.config](nuget.config)). Publish order when releasing: LLMLib first, then CopilotLib. | T0.2 |
+| [x] T0.1 | Add `bool RestrictToCustomTools { get; init; }` to `LLMSessionOptions` (`D:\dev\GenericLibs.Net\LLMs\LLMLib\ILLMSession.cs`); bump LLMLib to 0.3.0 (additive, non-breaking). | — |
+| [x] T0.2 | In `CopilotService.GetSessionAsync`, when the flag is set: `AvailableTools = ["web_fetch", ..customToolNames]` and use the restrictive permission handler (public URLs + caller custom tools only) even if `EnableBuiltInTools`/`ApproveAllPermissions` are on. Bump CopilotLib to 0.6.0, reference LLMLib 0.3.0. | T0.1 |
+| [x] T0.3 | `dotnet pack` LLMLib and CopilotLib into `D:\dev\GenericLibs.Net\local-nuget-feed` (already a source in [nuget.config](nuget.config)). Publish order when releasing: LLMLib first, then CopilotLib. | T0.2 |
 
 ### Phase 1 — Project skeleton & models
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T1.1 | Create `CodeAssistant.Lib/CodeAssistant.Lib.csproj` (net10.0, Nullable, ImplicitUsings; refs: `Neph.GenericLibs.Net.LLMLib` 0.3.0, `Microsoft.Extensions.FileSystemGlobbing`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions`). Add to [CodeAssistant.slnx](CodeAssistant.slnx). | T0.3 |
-| T1.2 | `Models/`: `FeatureRequest`, `FeaturePlan`, `PlanPhase`, `PlanTask`, `AcceptanceCriterion`, `AcceptanceTest` (+ `AcceptanceTestKind`), `RelevantFile` (+ `FileChangeKind`), `PlannerQuestion`, `PlanReview`, `FeaturePlanResult`, `PlanningPhase` enum. Block-scoped namespaces, System.Text.Json friendly (camelCase). | T1.1 |
+| [x] T1.1 | Create `CodeAssistant.Lib/CodeAssistant.Lib.csproj` (net10.0, Nullable, ImplicitUsings; refs: `Neph.GenericLibs.Net.LLMLib` 0.3.0, `Microsoft.Extensions.FileSystemGlobbing`, `Microsoft.Extensions.DependencyInjection.Abstractions`, `Microsoft.Extensions.Logging.Abstractions`). Add to [CodeAssistant.slnx](CodeAssistant.slnx). | T0.3 |
+| [x] T1.2 | `Models/`: `FeatureRequest`, `FeaturePlan`, `PlanPhase`, `PlanTask`, `AcceptanceCriterion`, `AcceptanceTest` (+ `AcceptanceTestKind`), `RelevantFile` (+ `FileChangeKind`), `PlannerQuestion`, `PlanReview`, `FeaturePlanResult`, `PlanningPhase` enum. Block-scoped namespaces, System.Text.Json friendly (camelCase). | T1.1 |
 
 ### Phase 2 — Sandboxed read-only tools
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T2.1 | `Tools/RepositorySandbox`: resolve paths with `Path.GetFullPath` against `RepositoryRoot`, reject anything outside root (root + separator, case-insensitive on Windows), reject reparse points escaping root, skip excluded directories (`bin`, `obj`, `.git`, `node_modules`, configurable). | T1.2 |
-| T2.2 | `Tools/ReadOnlyRepositoryTools.Create(sandbox, options)` → `AIFunction`s via `AIFunctionFactory.Create`: `list_dir`, `read_file` (line range, max lines/bytes, binary detection), `grep_search` (text/regex with `matchTimeout`, include glob, capped results), `file_search` (glob). Report each invocation through a callback. | T2.1 |
+| [x] T2.1 | `Tools/RepositorySandbox`: resolve paths with `Path.GetFullPath` against `RepositoryRoot`, reject anything outside root (root + separator, case-insensitive on Windows), reject reparse points escaping root, skip excluded directories (`bin`, `obj`, `.git`, `node_modules`, configurable). | T1.2 |
+| [x] T2.2 | `Tools/ReadOnlyRepositoryTools.Create(sandbox, options)` → `AIFunction`s via `AIFunctionFactory.Create`: `list_dir`, `read_file` (line range, max lines/bytes, binary detection), `grep_search` (text/regex with `matchTimeout`, include glob, capped results), `file_search` (glob). Report each invocation through a callback. | T2.1 |
 
 ### Phase 3 — Interaction tools, validator, renderer (parallel with Phase 2)
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T3.1 | `Validation/FeaturePlanValidator`: required title/summary/≥1 task; unique task/criterion/test ids; `DependsOn`/`ParallelWith`/`AcceptanceCriterionIds` reference existing ids; every criterion has ≥1 acceptance test; every test belongs to its criterion; every task linked to ≥1 criterion; `Modify`/`Reference` files exist inside the sandbox. Returns a list of actionable errors. | T1.2 |
-| T3.2 | `Rendering/FeaturePlanMarkdownRenderer`: TL;DR, Findings, Phases/Tasks (with dependencies), Acceptance criteria with per-criterion test table, Relevant files, Decisions, Out of scope, Further considerations. | T1.2 |
-| T3.3 | `Tools/PlannerInteractionTools` (per run, with a run-state holder): `ask_user` (flushes buffered assistant text, then `IPlanningInteraction.AskUserAsync`), `submit_plan(FeaturePlan plan)` (validate → return errors so the model resubmits, or store and return "accepted, wait for review"). | T3.1, T4.1 |
+| [x] T3.1 | `Validation/FeaturePlanValidator`: required title/summary/≥1 task; unique task/criterion/test ids; `DependsOn`/`ParallelWith`/`AcceptanceCriterionIds` reference existing ids; every criterion has ≥1 acceptance test; every test belongs to its criterion; every task linked to ≥1 criterion; `Modify`/`Reference` files exist inside the sandbox. Returns a list of actionable errors. | T1.2 |
+| [x] T3.2 | `Rendering/FeaturePlanMarkdownRenderer`: TL;DR, Findings, Phases/Tasks (with dependencies), Acceptance criteria with per-criterion test table, Relevant files, Decisions, Out of scope, Further considerations. | T1.2 |
+| [x] T3.3 | `Tools/PlannerInteractionTools` (per run, with a run-state holder): `ask_user` (flushes buffered assistant text, then `IPlanningInteraction.AskUserAsync`), `submit_plan(FeaturePlan plan)` (validate → return errors so the model resubmits, or store and return "accepted, wait for review"). | T3.1, T4.1 |
 
 ### Phase 4 — Orchestrator & DI
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T4.1 | `Planning/PlannerOptions` (`RepositoryRoot`, `Model`, `ReasoningEffort`, `PlansOutputDirectory` default `<root>/plans`, `ExcludedDirectories`, `MaxReadLines`, `MaxFileBytes`, `MaxSearchResults`, `MaxClarifyingQuestions`, `MaxSubmitRetries`), `Planning/IPlanningInteraction` (`OnPhaseChanged`, `OnAssistantMessage`, `OnToolInvoked`, `AskUserAsync`, `ReviewPlanAsync`), `Planning/PlannerPrompts` (system message + per-phase prompts). | T1.2 |
-| T4.2 | `Planning/FeaturePlanner : IFeaturePlanner.PlanAsync(FeatureRequest, IPlanningInteraction, CancellationToken)`: create session with `RestrictToCustomTools = true` and all tools; buffer streamed chunks into whole messages; run Discovery → Alignment → Design (nudge up to `MaxSubmitRetries` if no plan submitted) → Refinement loop (`ReviewPlanAsync`, feedback → revise + resubmit) until approved or cancelled. | T2.2, T3.2, T3.3, T4.1 |
-| T4.3 | Persist approved plan to `PlansOutputDirectory/yyyyMMdd-<slug>.md`; slug sanitized from title, final path verified inside the output directory. | T4.2 |
-| T4.4 | `CodeAssistantServiceCollectionExtensions.AddCodeAssistantLib(Action<PlannerOptions>)` registering options + `IFeaturePlanner` (host registers `ILLMService` separately). | T4.2 |
+| [x] T4.1 | `Planning/PlannerOptions` (`RepositoryRoot`, `Model`, `ReasoningEffort`, `PlansOutputDirectory` default `<root>/plans`, `ExcludedDirectories`, `MaxReadLines`, `MaxFileBytes`, `MaxSearchResults`, `MaxClarifyingQuestions`, `MaxSubmitRetries`), `Planning/IPlanningInteraction` (`OnPhaseChanged`, `OnAssistantMessage`, `OnToolInvoked`, `AskUserAsync`, `ReviewPlanAsync`), `Planning/PlannerPrompts` (system message + per-phase prompts). | T1.2 |
+| [x] T4.2 | `Planning/FeaturePlanner : IFeaturePlanner.PlanAsync(FeatureRequest, IPlanningInteraction, CancellationToken)`: create session with `RestrictToCustomTools = true` and all tools; buffer streamed chunks into whole messages; run Discovery → Alignment → Design (nudge up to `MaxSubmitRetries` if no plan submitted) → Refinement loop (`ReviewPlanAsync`, feedback → revise + resubmit) until approved or cancelled. | T2.2, T3.2, T3.3, T4.1 |
+| [x] T4.3 | Persist approved plan to `PlansOutputDirectory/yyyyMMdd-<slug>.md`; slug sanitized from title, final path verified inside the output directory. | T4.2 |
+| [x] T4.4 | `CodeAssistantServiceCollectionExtensions.AddCodeAssistantLib(Action<PlannerOptions>)` registering options + `IFeaturePlanner` (host registers `ILLMService` separately). | T4.2 |
 
 ### Phase 5 — TUI integration
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T5.1 | Add ProjectReference to CodeAssistant.Lib and bump `Neph.GenericLibs.Net.CopilotLib` to 0.6.0 in [CodeAssistant.TUI.csproj](CodeAssistant.TUI/CodeAssistant.TUI.csproj). | T4.4 |
-| T5.2 | [Program.cs](CodeAssistant.TUI/Program.cs): add "Plan feature" to `PromptForMode`; call `AddCodeAssistantLib` (`RepositoryRoot = Environment.CurrentDirectory`, selected model/effort); make `RenderToString` internal for reuse. | T5.1 |
-| T5.3 | `CodeAssistant.TUI/PlanningConsole.cs : IPlanningInteraction`: prompt for feature description, phase `Rule` headers, markdown-rendered assistant messages, grey tool-call lines, questions via [UserInputPrompt.cs](CodeAssistant.TUI/UserInputPrompt.cs), review = rendered plan + "Approve / Request changes" + feedback prompt, print saved path. | T5.2 |
+| [x] T5.1 | Add ProjectReference to CodeAssistant.Lib and bump `Neph.GenericLibs.Net.CopilotLib` to 0.6.0 in [CodeAssistant.TUI.csproj](CodeAssistant.TUI/CodeAssistant.TUI.csproj). | T4.4 |
+| [x] T5.2 | [Program.cs](CodeAssistant.TUI/Program.cs): add "Plan feature" to `PromptForMode`; call `AddCodeAssistantLib` (`RepositoryRoot = Environment.CurrentDirectory`, selected model/effort); make `RenderToString` internal for reuse. | T5.1 |
+| [x] T5.3 | `CodeAssistant.TUI/PlanningConsole.cs : IPlanningInteraction`: prompt for feature description, phase `Rule` headers, markdown-rendered assistant messages, grey tool-call lines, questions via [UserInputPrompt.cs](CodeAssistant.TUI/UserInputPrompt.cs), review = rendered plan + "Approve / Request changes" + feedback prompt, print saved path. | T5.2 |
 
 ### Phase 6 — Tests (parallel with Phase 5)
 
 | Id | Task | Depends on |
 |----|------|------------|
-| T6.1 | Create `CodeAssistant.Lib.Tests` (xUnit), add to slnx. | T1.1 |
-| T6.2 | Sandbox & tools tests (path escapes, junctions, excluded dirs, caps, regex timeout). | T2.2, T6.1 |
-| T6.3 | Validator, renderer, slug/save-path tests; deserialize [CodeAssistant.Lib.plan.json](CodeAssistant.Lib.plan.json) into `FeaturePlan` and validate it as a fixture. | T3.1, T3.2, T4.3, T6.1 |
-| T6.4 | `FeaturePlanner` tests with a fake `ILLMService`/`ILLMSession` that invokes tools directly: happy path, resubmit after validation errors, missing-submission nudges, feedback loop, `RestrictToCustomTools` set. | T4.2, T6.1 |
+| [x] T6.1 | Create `CodeAssistant.Lib.Tests` (xUnit), add to slnx. | T1.1 |
+| [x] T6.2 | Sandbox & tools tests (path escapes, junctions, excluded dirs, caps, regex timeout). | T2.2, T6.1 |
+| [x] T6.3 | Validator, renderer, slug/save-path tests; deserialize [CodeAssistant.Lib.plan.json](CodeAssistant.Lib.plan.json) into `FeaturePlan` and validate it as a fixture. | T3.1, T3.2, T4.3, T6.1 |
+| [x] T6.4 | `FeaturePlanner` tests with a fake `ILLMService`/`ILLMSession` that invokes tools directly: happy path, resubmit after validation errors, missing-submission nudges, feedback loop, `RestrictToCustomTools` set. | T4.2, T6.1 |
 
 ## Acceptance criteria & tests
 

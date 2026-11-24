@@ -1,5 +1,7 @@
 ﻿using System.Text;
 using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
+using CodeAssistant.Lib;
+using CodeAssistant.Lib.Planning;
 using CopilotLib;
 using LLMLib;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +19,8 @@ namespace CodeAssistant.TUI
     {
         private const string ProductionMode = "Production mode";
         private const string FullControlMode = "Full control";
-        private const int AssistantPrefixWidth = 11;
+        private const string PlanFeatureMode = "Plan feature";
+        internal const int AssistantPrefixWidth = 11;
         private const string SonnetModel = "claude-sonnet-5.5";
         private const string OpusModel = "claude-opus-5.5";
 
@@ -29,7 +32,7 @@ namespace CodeAssistant.TUI
         public static async Task Main(string[] args)
         {
             string token = PromptForToken();
-            bool productionMode = PromptForMode();
+            string mode = PromptForMode();
             string model = PromptForModel();
             string reasoningEffort = PromptForReasoningEffort(model);
             AnsiConsole.Clear();
@@ -48,16 +51,37 @@ namespace CodeAssistant.TUI
                 options.ApproveAllPermissions = true;
                 options.UserInputHandler = UserInputPrompt.HandleAsync;
             });
+            builder.Services.AddCodeAssistantLib(options =>
+            {
+                options.RepositoryRoot = Environment.CurrentDirectory;
+                options.Model = model;
+                options.ReasoningEffort = reasoningEffort;
+            });
 
             using IHost host = builder.Build();
             await using ILLMService llm = host.Services.GetRequiredService<ILLMService>();
 
-            await RunChatAsync(llm, productionMode, model, reasoningEffort);
+            using CancellationTokenSource exit = new();
+            RegisterShutdown(llm, exit);
+
+            AnsiConsole.Write(new FigletText("CodeAssistant").Color(Color.DeepSkyBlue1));
+            AnsiConsole.MarkupLine("[grey]Type [bold]exit[/] to quit.[/]");
+            AnsiConsole.WriteLine();
+
+            if (mode == PlanFeatureMode)
+            {
+                await PlanningConsole.RunAsync(host.Services.GetRequiredService<IFeaturePlanner>(), exit.Token);
+            }
+            else
+            {
+                await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, exit.Token);
+            }
+
+            AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
         }
 
-        private static async Task RunChatAsync(ILLMService llm, bool productionMode, string model, string reasoningEffort)
+        private static void RegisterShutdown(ILLMService llm, CancellationTokenSource exit)
         {
-            using CancellationTokenSource exit = new();
             int shuttingDown = 0;
             Console.CancelKeyPress += (_, e) =>
             {
@@ -83,16 +107,15 @@ namespace CodeAssistant.TUI
                 Log.CloseAndFlush();
                 Environment.Exit(0);
             };
+        }
 
-            AnsiConsole.Write(new FigletText("CodeAssistant").Color(Color.DeepSkyBlue1));
-            AnsiConsole.MarkupLine("[grey]Type [bold]exit[/] to quit.[/]");
-            AnsiConsole.WriteLine();
-
+        private static async Task RunChatAsync(ILLMService llm, bool productionMode, string model, string reasoningEffort, CancellationToken cancellationToken)
+        {
             await using ILLMSession session = await llm.CreateSessionAsync(
                 new LLMSessionOptions { SystemMessage = productionMode ? ProductionSystemMessage : null, Model = model, ReasoningEffort = reasoningEffort },
-                exit.Token);
+                cancellationToken);
 
-            while (!exit.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 string input;
                 try
@@ -116,7 +139,7 @@ namespace CodeAssistant.TUI
 
                 try
                 {
-                    await StreamReplyAsync(session, input, exit.Token);
+                    await StreamReplyAsync(session, input, cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -132,8 +155,6 @@ namespace CodeAssistant.TUI
 
                 AnsiConsole.WriteLine();
             }
-
-            AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
         }
 
         private static async Task StreamReplyAsync(ILLMSession session, string input, CancellationToken cancellationToken = default)
@@ -212,7 +233,7 @@ namespace CodeAssistant.TUI
             }
         }
 
-        private static string RenderToString(IRenderable renderable, int width)
+        internal static string RenderToString(IRenderable renderable, int width)
         {
             StringWriter writer = new();
             IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
@@ -226,12 +247,11 @@ namespace CodeAssistant.TUI
             return writer.ToString();
         }
 
-        private static bool PromptForMode()
+        private static string PromptForMode()
         {
-            string mode = AnsiConsole.Prompt(new SelectionPrompt<string>()
+            return AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("[bold]Select a mode:[/]")
-                .AddChoices(ProductionMode, FullControlMode));
-            return mode == ProductionMode;
+                .AddChoices(ProductionMode, FullControlMode, PlanFeatureMode));
         }
 
         private static string PromptForModel()

@@ -15,6 +15,7 @@
       "tasks": [
         {
           "id": "T0.1",
+          "status": "done",
           "title": "Add RestrictToCustomTools to LLMSessionOptions",
           "description": "Add `bool RestrictToCustomTools { get; init; }` to LLMSessionOptions; bump LLMLib to 0.3.0 (additive, non-breaking).",
           "files": [ "D:\\dev\\GenericLibs.Net\\LLMs\\LLMLib\\ILLMSession.cs", "D:\\dev\\GenericLibs.Net\\LLMs\\LLMLib\\LLMLib.csproj" ],
@@ -24,6 +25,7 @@
         },
         {
           "id": "T0.2",
+          "status": "done",
           "title": "Honor RestrictToCustomTools in CopilotService",
           "description": "In GetSessionAsync, when the flag is set use AvailableTools = [\"web_fetch\", ..customToolNames] and the restrictive permission handler even if EnableBuiltInTools/ApproveAllPermissions are on. Bump CopilotLib to 0.6.0 and reference LLMLib 0.3.0.",
           "files": [ "D:\\dev\\GenericLibs.Net\\LLMs\\CopilotLib\\CopilotService.cs", "D:\\dev\\GenericLibs.Net\\LLMs\\CopilotLib\\CopilotLib.csproj" ],
@@ -33,6 +35,7 @@
         },
         {
           "id": "T0.3",
+          "status": "done",
           "title": "Pack LLMLib and CopilotLib to the local feed",
           "description": "dotnet pack both into D:\\dev\\GenericLibs.Net\\local-nuget-feed for local consumption. Release order: LLMLib first, then CopilotLib.",
           "files": [ "nuget.config" ],
@@ -48,6 +51,7 @@
       "tasks": [
         {
           "id": "T1.1",
+          "status": "done",
           "title": "Create CodeAssistant.Lib project",
           "description": "net10.0, Nullable, ImplicitUsings; refs Neph.GenericLibs.Net.LLMLib 0.3.0, Microsoft.Extensions.FileSystemGlobbing, Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.Extensions.Logging.Abstractions. Add to CodeAssistant.slnx.",
           "files": [ "CodeAssistant.Lib/CodeAssistant.Lib.csproj", "CodeAssistant.slnx" ],
@@ -57,6 +61,7 @@
         },
         {
           "id": "T1.2",
+          "status": "done",
           "title": "Add models",
           "description": "FeatureRequest, FeaturePlan, PlanPhase, PlanTask, AcceptanceCriterion, AcceptanceTest (+ AcceptanceTestKind), RelevantFile (+ FileChangeKind), PlannerQuestion, PlanReview, FeaturePlanResult, PlanningPhase enum. Block-scoped namespaces, camelCase System.Text.Json.",
           "files": [ "CodeAssistant.Lib/Models/" ],
@@ -72,6 +77,7 @@
       "tasks": [
         {
           "id": "T2.1",
+          "status": "done",
           "title": "RepositorySandbox",
           "description": "Resolve paths with Path.GetFullPath against RepositoryRoot; reject paths outside root (root + separator, case-insensitive on Windows) and reparse points escaping root; skip excluded directories (bin, obj, .git, node_modules, configurable).",
           "files": [ "CodeAssistant.Lib/Tools/RepositorySandbox.cs" ],
@@ -81,6 +87,7 @@
         },
         {
           "id": "T2.2",
+          "status": "done",
           "title": "ReadOnlyRepositoryTools",
           "description": "AIFunctionFactory-based list_dir, read_file (line range, max lines/bytes, binary detection), grep_search (text/regex with matchTimeout, include glob, capped results), file_search (glob). Report each invocation through a callback.",
           "files": [ "CodeAssistant.Lib/Tools/ReadOnlyRepositoryTools.cs" ],
@@ -96,6 +103,7 @@
       "tasks": [
         {
           "id": "T3.1",
+          "status": "done",
           "title": "FeaturePlanValidator",
           "description": "Required title/summary/>=1 task; unique ids; DependsOn/ParallelWith/AcceptanceCriterionIds reference existing ids; every criterion has >=1 acceptance test; every task linked to >=1 criterion; Modify/Reference files exist in the sandbox. Returns actionable errors.",
           "files": [ "CodeAssistant.Lib/Validation/FeaturePlanValidator.cs" ],
@@ -105,6 +113,7 @@
         },
         {
           "id": "T3.2",
+          "status": "done",
           "title": "FeaturePlanMarkdownRenderer",
           "description": "Render TL;DR, Findings, Phases/Tasks with dependencies, Acceptance criteria with per-criterion test table, Relevant files, Decisions, Out of scope, Further considerations.",
           "files": [ "CodeAssistant.Lib/Rendering/FeaturePlanMarkdownRenderer.cs" ],
@@ -114,6 +123,7 @@
         },
         {
           "id": "T3.3",
+          "status": "done",
           "title": "PlannerInteractionTools",
           "description": "Per-run ask_user (flush buffered assistant text, then IPlanningInteraction.AskUserAsync) and submit_plan(FeaturePlan) (validate; return errors so the model resubmits, or store and return 'accepted, wait for review').",
           "files": [ "CodeAssistant.Lib/Tools/PlannerInteractionTools.cs" ],
@@ -129,6 +139,7 @@
       "tasks": [
         {
           "id": "T4.1",
+          "status": "done",
           "title": "Options, interaction contract and prompts",
           "description": "PlannerOptions (RepositoryRoot, Model, ReasoningEffort, PlansOutputDirectory default <root>/plans, ExcludedDirectories, MaxReadLines, MaxFileBytes, MaxSearchResults, MaxClarifyingQuestions, MaxSubmitRetries), IPlanningInteraction (OnPhaseChanged, OnAssistantMessage, OnToolInvoked, AskUserAsync, ReviewPlanAsync), PlannerPrompts (system message + per-phase prompts).",
           "files": [ "CodeAssistant.Lib/Planning/PlannerOptions.cs", "CodeAssistant.Lib/Planning/IPlanningInteraction.cs", "CodeAssistant.Lib/Planning/PlannerPrompts.cs" ],
@@ -138,6 +149,7 @@
         },
         {
           "id": "T4.2",
+          "status": "done",
           "title": "FeaturePlanner orchestrator",
           "description": "IFeaturePlanner.PlanAsync(FeatureRequest, IPlanningInteraction, CancellationToken): create session with RestrictToCustomTools = true and all tools; buffer streamed chunks into whole messages; Discovery -> Alignment -> Design (nudge up to MaxSubmitRetries) -> Refinement loop until approved or cancelled.",
           "files": [ "CodeAssistant.Lib/Planning/FeaturePlanner.cs", "CodeAssistant.Lib/Planning/IFeaturePlanner.cs" ],
@@ -147,6 +159,7 @@
         },
         {
           "id": "T4.3",
+          "status": "done",
           "title": "Persist approved plan",
           "description": "Save to PlansOutputDirectory/yyyyMMdd-<slug>.md; sanitize slug from title and verify the final path stays inside the output directory.",
           "files": [ "CodeAssistant.Lib/Planning/FeaturePlanner.cs" ],
@@ -156,6 +169,7 @@
         },
         {
           "id": "T4.4",
+          "status": "done",
           "title": "AddCodeAssistantLib DI extension",
           "description": "AddCodeAssistantLib(Action<PlannerOptions>) registers options and IFeaturePlanner; the host registers ILLMService separately.",
           "files": [ "CodeAssistant.Lib/CodeAssistantServiceCollectionExtensions.cs" ],
@@ -171,6 +185,7 @@
       "tasks": [
         {
           "id": "T5.1",
+          "status": "done",
           "title": "Reference the lib and bump CopilotLib",
           "description": "Add ProjectReference to CodeAssistant.Lib and bump Neph.GenericLibs.Net.CopilotLib to 0.6.0.",
           "files": [ "CodeAssistant.TUI/CodeAssistant.TUI.csproj" ],
@@ -180,6 +195,7 @@
         },
         {
           "id": "T5.2",
+          "status": "done",
           "title": "Plan feature mode in Program.cs",
           "description": "Add 'Plan feature' to PromptForMode; call AddCodeAssistantLib (RepositoryRoot = Environment.CurrentDirectory, selected model/effort); make RenderToString internal for reuse.",
           "files": [ "CodeAssistant.TUI/Program.cs" ],
@@ -189,6 +205,7 @@
         },
         {
           "id": "T5.3",
+          "status": "done",
           "title": "PlanningConsole",
           "description": "IPlanningInteraction implementation: prompt for feature description, phase Rule headers, markdown-rendered assistant messages, grey tool-call lines, questions via UserInputPrompt, review = rendered plan + Approve/Request changes + feedback, print saved path.",
           "files": [ "CodeAssistant.TUI/PlanningConsole.cs", "CodeAssistant.TUI/UserInputPrompt.cs" ],
@@ -204,6 +221,7 @@
       "tasks": [
         {
           "id": "T6.1",
+          "status": "done",
           "title": "Create CodeAssistant.Lib.Tests",
           "description": "xUnit project referencing CodeAssistant.Lib; add to CodeAssistant.slnx.",
           "files": [ "CodeAssistant.Lib.Tests/CodeAssistant.Lib.Tests.csproj", "CodeAssistant.slnx" ],
@@ -213,6 +231,7 @@
         },
         {
           "id": "T6.2",
+          "status": "done",
           "title": "Sandbox and tools tests",
           "description": "Path escapes (.., absolute, junctions), excluded dirs, read_file/grep caps, regex timeout.",
           "files": [ "CodeAssistant.Lib.Tests/Tools/" ],
@@ -222,6 +241,7 @@
         },
         {
           "id": "T6.3",
+          "status": "done",
           "title": "Validator, renderer and persistence tests",
           "description": "One test per validator rule, renderer sections, slug/save path; deserialize CodeAssistant.Lib.plan.json into FeaturePlan and validate it as a fixture.",
           "files": [ "CodeAssistant.Lib.Tests/Validation/", "CodeAssistant.Lib.Tests/Rendering/", "CodeAssistant.Lib.plan.json" ],
@@ -231,6 +251,7 @@
         },
         {
           "id": "T6.4",
+          "status": "done",
           "title": "FeaturePlanner tests with fake session",
           "description": "Fake ILLMService/ILLMSession invoking tools directly: happy path, resubmit after validation errors, missing-submission nudges, feedback loop, RestrictToCustomTools set.",
           "files": [ "CodeAssistant.Lib.Tests/Planning/" ],
