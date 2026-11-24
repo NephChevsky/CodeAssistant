@@ -34,7 +34,7 @@ namespace CodeAssistant.TUI
                 try
                 {
                     FeaturePlanResult result = await planner.PlanAsync(new FeatureRequest { Description = description }, console, cancellationToken);
-                    AnsiConsole.MarkupLine($"[green]Plan saved to[/] {Markup.Escape(result.MarkdownPath)}");
+                    AnsiConsole.MarkupLine($"[green]Plan saved to[/] {Markup.Escape(result.MarkdownPath)} [green]and[/] {Markup.Escape(result.JsonPath)}");
                 }
                 catch (OperationCanceledException)
                 {

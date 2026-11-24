@@ -10,7 +10,7 @@ namespace CodeAssistant.Lib.Models
     /// <summary>User verdict on a submitted plan. <see cref="Feedback"/> is required when not approved.</summary>
     public sealed record PlanReview(bool Approved, string? Feedback = null);
 
-    public sealed record FeaturePlanResult(FeaturePlan Plan, string MarkdownPath, string SessionId);
+    public sealed record FeaturePlanResult(FeaturePlan Plan, string MarkdownPath, string JsonPath, string SessionId);
 
     public enum PlanningPhase
     {

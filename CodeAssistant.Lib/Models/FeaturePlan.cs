@@ -8,6 +8,9 @@ namespace CodeAssistant.Lib.Models
         [Description("Short title of the feature (2-10 words).")]
         public string Title { get; set; } = string.Empty;
 
+        [Description("Absolute path of the root of the repository the plan applies to. All file paths of the plan are relative to it.")]
+        public string RepositoryRoot { get; set; } = string.Empty;
+
         [Description("TL;DR: what will be done, how, and why.")]
         public string Summary { get; set; } = string.Empty;
 

@@ -9,6 +9,11 @@ namespace CodeAssistant.Lib.Rendering
         {
             StringBuilder md = new();
             md.AppendLine($"# Plan: {plan.Title}").AppendLine();
+            if (!string.IsNullOrWhiteSpace(plan.RepositoryRoot))
+            {
+                md.AppendLine($"Repository: `{plan.RepositoryRoot}`").AppendLine();
+            }
+
             md.AppendLine("## TL;DR").AppendLine().AppendLine(plan.Summary).AppendLine();
 
             AppendList(md, "Findings", plan.Findings);

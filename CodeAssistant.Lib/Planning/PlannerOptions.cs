@@ -11,7 +11,7 @@ namespace CodeAssistant.Lib.Planning
         /// <summary>Reasoning effort requested from the model (e.g. "low", "medium", "high"). Provider default when null.</summary>
         public string? ReasoningEffort { get; set; }
 
-        /// <summary>Directory where approved plans are written. Defaults to &lt;RepositoryRoot&gt;/plans, or Documents/CodeAssistant/plans without a repository root.</summary>
+        /// <summary>Directory where approved plans are written. Defaults to the root of the repository the plan applies to.</summary>
         public string? PlansOutputDirectory { get; set; }
 
         /// <summary>Directory names hidden from the planner's tools, at any depth.</summary>
@@ -30,12 +30,9 @@ namespace CodeAssistant.Lib.Planning
 
         public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(2);
 
-        internal string GetPlansOutputDirectory()
+        internal string GetPlansOutputDirectory(string planRepositoryRoot)
         {
-            string defaultDirectory = RepositoryRoot is null
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CodeAssistant", "plans")
-                : Path.Combine(RepositoryRoot, "plans");
-            return Path.GetFullPath(PlansOutputDirectory ?? defaultDirectory);
+            return Path.GetFullPath(PlansOutputDirectory ?? planRepositoryRoot);
         }
     }
 }

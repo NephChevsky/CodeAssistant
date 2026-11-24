@@ -11,6 +11,8 @@ namespace CodeAssistant.Lib.Planning
     public sealed class FeaturePlanner : IFeaturePlanner
     {
         private const int MaxSlugLength = 60;
+        private const string MarkdownExtension = ".plan.md";
+        private const string JsonExtension = ".plan.json";
 
         private readonly ILLMService _llm;
         private readonly PlannerOptions _options;
@@ -70,32 +72,33 @@ namespace CodeAssistant.Lib.Planning
                 plan = await RequestPlanAsync(session, PlannerPrompts.Revision(feedback), interactionTools, buffer, cancellationToken);
             }
 
-            string path = GetPlanPath(_options.GetPlansOutputDirectory(), plan.Title, DateTime.Now);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await File.WriteAllTextAsync(path, markdown, cancellationToken);
+            (string markdownPath, string jsonPath) = GetPlanPaths(_options.GetPlansOutputDirectory(plan.RepositoryRoot), plan.Title, DateTime.Now);
+            Directory.CreateDirectory(Path.GetDirectoryName(markdownPath)!);
+            await File.WriteAllTextAsync(markdownPath, markdown, cancellationToken);
+            await File.WriteAllTextAsync(jsonPath, FeaturePlanJson.Serialize(plan), cancellationToken);
 
             interaction.OnPhaseChanged(PlanningPhase.Completed);
-            return new FeaturePlanResult(plan, path, session.SessionId);
+            return new FeaturePlanResult(plan, markdownPath, jsonPath, session.SessionId);
         }
 
-        /// <summary>Builds a unique <c>yyyyMMdd-slug.md</c> path that is guaranteed to be directly inside <paramref name="outputDirectory"/>.</summary>
-        internal static string GetPlanPath(string outputDirectory, string title, DateTime date)
+        /// <summary>Builds unique <c>yyyyMMdd-slug.plan.md</c> / <c>.plan.json</c> paths that are guaranteed to be directly inside <paramref name="outputDirectory"/>.</summary>
+        internal static (string MarkdownPath, string JsonPath) GetPlanPaths(string outputDirectory, string title, DateTime date)
         {
             string directory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(outputDirectory));
             string baseName = $"{date:yyyyMMdd}-{Slugify(title)}";
-            string path = Path.Combine(directory, baseName + ".md");
-            for (int i = 2; File.Exists(path); i++)
+            string basePath = Path.Combine(directory, baseName);
+            for (int i = 2; File.Exists(basePath + MarkdownExtension) || File.Exists(basePath + JsonExtension); i++)
             {
-                path = Path.Combine(directory, $"{baseName}-{i}.md");
+                basePath = Path.Combine(directory, $"{baseName}-{i}");
             }
 
-            string fullPath = Path.GetFullPath(path);
-            if (!string.Equals(Path.GetDirectoryName(fullPath), directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            string fullBasePath = Path.GetFullPath(basePath);
+            if (!string.Equals(Path.GetDirectoryName(fullBasePath), directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             {
-                throw new InvalidOperationException($"Plan path '{fullPath}' escapes the output directory.");
+                throw new InvalidOperationException($"Plan path '{fullBasePath}' escapes the output directory.");
             }
 
-            return fullPath;
+            return (fullBasePath + MarkdownExtension, fullBasePath + JsonExtension);
         }
 
         /// <summary>Lowercase ASCII letters and digits separated by single dashes; "plan" when nothing remains.</summary>

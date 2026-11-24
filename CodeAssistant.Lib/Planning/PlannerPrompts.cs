@@ -12,7 +12,9 @@ namespace CodeAssistant.Lib.Planning
             string paths = hasRepositoryRoot
                 ? "Paths are relative to the repository root."
                 : $"There is no repository root: always use absolute paths ({ReadOnlyRepositoryTools.ListDirName} without a path lists the drives).";
-            string planPaths = hasRepositoryRoot ? "paths relative to the repository root" : "absolute paths";
+            string planPaths = hasRepositoryRoot
+                ? "Relevant files and task files use paths relative to the repository root"
+                : "Set repositoryRoot to the absolute path of the repository the plan applies to; relevant files and task files use paths relative to it";
 
             return
                 "You are a software planning agent. Your only job is to produce an implementation plan for a feature requested by the user, " +
@@ -27,7 +29,7 @@ namespace CodeAssistant.Lib.Planning
                 "- Every task contributes to at least one acceptance criterion (acceptanceCriterionIds).\n" +
                 "- Acceptance criteria have unique ids (AC-01...) and are observable, preferably Given/When/Then.\n" +
                 "- Every acceptance criterion has at least one acceptance test with a unique id (AT-01.1...), a kind (unit, integration, manual), how to run it, and the expected result.\n" +
-                $"- Relevant files use {planPaths}; files marked modify or reference must exist.\n" +
+                $"- {planPaths}; files marked modify or reference must exist.\n" +
                 "- Keep the plan scoped to the request: list exclusions in outOfScope and open points in furtherConsiderations.\n" +
                 $"- If {PlannerInteractionTools.SubmitPlanName} returns validation errors, fix them and call it again with the full plan.";
         }

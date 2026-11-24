@@ -77,19 +77,49 @@ namespace CodeAssistant.Lib.Validation
                 }
             }
 
-            if (sandbox is not null)
+            if (sandbox is not null && GetRepositoryRoot(plan, sandbox, errors) is { } root)
             {
                 foreach (RelevantFile file in plan.RelevantFiles.Where(f => f.Change is FileChangeKind.Modify or FileChangeKind.Reference))
                 {
-                    if (!FileExists(sandbox, file.Path))
+                    if (Path.IsPathRooted(file.Path))
                     {
-                        string hint = sandbox.Root is null ? "use an absolute path" : "use a path relative to the repository root";
-                        errors.Add($"relevant file '{file.Path}' is marked {file.Change.ToString().ToLowerInvariant()} but does not exist ({hint}, or mark it create).");
+                        errors.Add($"relevant file '{file.Path}' must be relative to the repository root.");
+                    }
+                    else if (!FileExists(sandbox, Path.Combine(root, file.Path)))
+                    {
+                        errors.Add($"relevant file '{file.Path}' is marked {file.Change.ToString().ToLowerInvariant()} but does not exist (use a path relative to the repository root, or mark it create).");
                     }
                 }
             }
 
             return errors;
+        }
+
+        /// <summary>The sandbox root when there is one, otherwise the plan's repositoryRoot when it is an accessible directory.</summary>
+        private static string? GetRepositoryRoot(FeaturePlan plan, RepositorySandbox sandbox, List<string> errors)
+        {
+            if (sandbox.Root is not null)
+            {
+                return sandbox.Root;
+            }
+
+            if (!string.IsNullOrWhiteSpace(plan.RepositoryRoot) && Path.IsPathFullyQualified(plan.RepositoryRoot))
+            {
+                try
+                {
+                    string fullPath = sandbox.Resolve(plan.RepositoryRoot);
+                    if (Directory.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or ArgumentException or NotSupportedException)
+                {
+                }
+            }
+
+            errors.Add($"repositoryRoot '{plan.RepositoryRoot}' must be the absolute path of an existing directory: the root of the repository the plan applies to.");
+            return null;
         }
 
         private static HashSet<string> CheckIds(string kind, IEnumerable<string> ids, List<string> errors)

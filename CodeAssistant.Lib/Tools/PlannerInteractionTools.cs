@@ -62,6 +62,11 @@ namespace CodeAssistant.Lib.Tools
 
         public string SubmitPlan([Description("The complete plan.")] FeaturePlan plan)
         {
+            if (_sandbox.Root is not null)
+            {
+                plan.RepositoryRoot = _sandbox.Root;
+            }
+
             IReadOnlyList<string> errors = FeaturePlanValidator.Validate(plan, _sandbox);
             _interaction.OnToolInvoked(SubmitPlanName, errors.Count == 0 ? "plan is valid" : $"{errors.Count} validation error(s)");
             if (errors.Count > 0)
