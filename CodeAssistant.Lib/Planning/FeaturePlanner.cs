@@ -44,7 +44,6 @@ namespace CodeAssistant.Lib.Planning
                 Model = _options.Model,
                 ReasoningEffort = _options.ReasoningEffort,
                 Tools = tools,
-                RestrictToCustomTools = true,
             }, cancellationToken);
 
             interaction.OnPhaseChanged(PlanningPhase.Discovery);
