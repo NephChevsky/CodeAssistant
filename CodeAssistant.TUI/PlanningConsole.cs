@@ -1,7 +1,6 @@
 using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
 using CodeAssistant.Lib.Models;
 using CodeAssistant.Lib.Planning;
-using CopilotLib;
 using Spectre.Console;
 
 namespace CodeAssistant.TUI
@@ -89,20 +88,15 @@ namespace CodeAssistant.TUI
             }
         }
 
-        public async Task<string> AskUserAsync(PlannerQuestion question, CancellationToken cancellationToken)
+        public Task<string> AskUserAsync(PlannerQuestion question, CancellationToken cancellationToken)
         {
             lock (_lock)
             {
                 ClearThinking();
-            }
-
-            UserInputAnswer answer = await UserInputPrompt.HandleAsync(new UserInputQuestion(question.Question, question.Choices, question.AllowFreeform));
-            lock (_lock)
-            {
+                string answer = UserInputPrompt.Ask(question);
                 ShowThinking();
+                return Task.FromResult(answer);
             }
-
-            return answer.Answer;
         }
 
         public Task<PlanReview> ReviewPlanAsync(FeaturePlan plan, string markdown, CancellationToken cancellationToken)

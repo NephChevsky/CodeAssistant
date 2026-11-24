@@ -1,17 +1,12 @@
-using CopilotLib;
+using CodeAssistant.Lib.Models;
 using Spectre.Console;
 
 namespace CodeAssistant.TUI
 {
     public static class UserInputPrompt
     {
-        /// <summary>Invoked before a prompt so pending assistant output can be rendered first.</summary>
-        public static Action? BeforePrompt { get; set; }
-
-        public static Task<UserInputAnswer> HandleAsync(UserInputQuestion request)
+        public static string Ask(PlannerQuestion request)
         {
-            BeforePrompt?.Invoke();
-
             AnsiConsole.WriteLine();
             AnsiConsole.Write(new Panel(new Text(request.Question))
                 .Header("[bold yellow]Question[/]")
@@ -30,12 +25,11 @@ namespace CodeAssistant.TUI
                 string selected = AnsiConsole.Prompt(new SelectionPrompt<string>().AddChoices(choices));
                 if (selected != other)
                 {
-                    return Task.FromResult(new UserInputAnswer(selected, false));
+                    return selected;
                 }
             }
 
-            string answer = AnsiConsole.Prompt(new TextPrompt<string>("[bold cyan]Answer>[/]").AllowEmpty());
-            return Task.FromResult(new UserInputAnswer(answer, true));
+            return AnsiConsole.Prompt(new TextPrompt<string>("[bold cyan]Answer>[/]").AllowEmpty());
         }
     }
 }

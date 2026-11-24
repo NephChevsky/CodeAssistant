@@ -44,13 +44,7 @@ namespace CodeAssistant.TUI
             });
             builder.Logging.ClearProviders();
             builder.UseSerilogLib(writeToConsole: false);
-            builder.Services.AddCopilotLib(options =>
-            {
-                options.EnableBuiltInTools = true;
-                options.WorkingDirectory = Environment.CurrentDirectory;
-                options.ApproveAllPermissions = true;
-                options.UserInputHandler = UserInputPrompt.HandleAsync;
-            });
+            builder.Services.AddCopilotLib(options => options.WorkingDirectory = Environment.CurrentDirectory);
             builder.Services.AddCodeAssistantLib(options =>
             {
                 options.RepositoryRoot = Environment.CurrentDirectory;
@@ -162,8 +156,7 @@ namespace CodeAssistant.TUI
             AnsiConsole.Markup("[bold green]Assistant>[/] ");
             AnsiConsole.Markup("[grey italic]Thinking...[/]");
 
-            // Text is buffered and rendered as markdown. It is also flushed before any authorization prompt,
-            // because Spectre cannot show a prompt while a live display is active.
+            // Text is buffered and rendered as markdown once the reply is complete.
             StringBuilder pending = new();
             bool thinkingShown = true;
             bool prefixShown = false;
@@ -207,7 +200,6 @@ namespace CodeAssistant.TUI
                 Console.Out.Write(rendered.TrimEnd() + Environment.NewLine);
             }
 
-            UserInputPrompt.BeforePrompt = Flush;
             try
             {
                 await foreach (string chunk in session.AskStreamingAsync(input, cancellationToken: cancellationToken))
@@ -222,8 +214,6 @@ namespace CodeAssistant.TUI
             }
             finally
             {
-                UserInputPrompt.BeforePrompt = null;
-
                 // On failure the "Assistant> Thinking..." line is still displayed; clear it so the error starts on a clean line.
                 if (thinkingShown)
                 {
