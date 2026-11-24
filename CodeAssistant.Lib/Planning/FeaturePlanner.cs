@@ -27,7 +27,7 @@ namespace CodeAssistant.Lib.Planning
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Description);
 
-            RepositorySandbox sandbox = new(_options.RepositoryRoot, _options.ExcludedDirectories);
+            RepositorySandbox sandbox = new(request.RepositoryRoot ?? _options.RepositoryRoot, _options.ExcludedDirectories);
             MessageBuffer buffer = new(interaction);
             PlannerInteractionTools interactionTools = new(interaction, sandbox, _options.MaxClarifyingQuestions, buffer.Flush, cancellationToken);
             List<AIFunction> tools =
@@ -43,8 +43,8 @@ namespace CodeAssistant.Lib.Planning
             await using ILLMSession session = await _llm.CreateSessionAsync(new LLMSessionOptions
             {
                 SystemMessage = PlannerPrompts.SystemMessage(sandbox.Root is not null),
-                Model = _options.Model,
-                ReasoningEffort = _options.ReasoningEffort,
+                Model = request.Model ?? _options.Model,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                 Tools = tools,
             }, cancellationToken);
 

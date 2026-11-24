@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
-using CodeAssistant.Lib.Planning;
-using CodeAssistant.Lib.Tools;
+using CodeAssistant.Lib.Chat;
 using CopilotLib;
 using LLMLib;
 using Microsoft.Extensions.AI;
@@ -23,16 +22,6 @@ namespace CodeAssistant.TUI
         internal const int AssistantPrefixWidth = 11;
         private const string SonnetModel = "claude-sonnet-5.5";
         private const string OpusModel = "claude-opus-5.5";
-
-        private const string ProductionSystemMessage =
-            "You are running in a production environment. You may freely consult and read things (files, configuration, logs, data, web pages), " +
-            "but you must never modify anything (create, edit, delete or move files, run commands with side effects, change configuration or data) " +
-            "without first asking the user for explicit permission and receiving it.";
-
-        private const string FileAccessSystemMessage =
-            $"You can read any file on this machine with the {ReadOnlyRepositoryTools.ListDirName}, {ReadOnlyRepositoryTools.ReadFileName}, {ReadOnlyRepositoryTools.GrepSearchName} " +
-            $"and {ReadOnlyRepositoryTools.FileSearchName} tools, always using absolute paths ({ReadOnlyRepositoryTools.ListDirName} without a path lists the drives). " +
-            "You have no tool to modify files or run commands.";
 
         public static async Task Main(string[] args)
         {
@@ -61,7 +50,7 @@ namespace CodeAssistant.TUI
             AnsiConsole.MarkupLine("[grey]Type [bold]exit[/] to quit.[/]");
             AnsiConsole.WriteLine();
 
-            IReadOnlyList<AIFunction> tools = ReadOnlyRepositoryTools.Create(new RepositorySandbox(null, []), new PlannerOptions());
+            IReadOnlyList<AIFunction> tools = ChatAssistant.CreateTools();
             await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, tools, exit.Token);
 
             AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
@@ -98,7 +87,7 @@ namespace CodeAssistant.TUI
 
         private static async Task RunChatAsync(ILLMService llm, bool productionMode, string model, string reasoningEffort, IReadOnlyList<AIFunction> tools, CancellationToken cancellationToken)
         {
-            string systemMessage = productionMode ? ProductionSystemMessage + "\n\n" + FileAccessSystemMessage : FileAccessSystemMessage;
+            string systemMessage = ChatAssistant.SystemMessage(productionMode);
             await using ILLMSession session = await llm.CreateSessionAsync(
                 new LLMSessionOptions { SystemMessage = systemMessage, Model = model, ReasoningEffort = reasoningEffort, Tools = tools },
                 cancellationToken);

@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="CodeAssistant.Lib.Tests/CodeAssistant.Lib.Tests.csproj" />
   <Project Path="CodeAssistant.Lib/CodeAssistant.Lib.csproj" />
   <Project Path="CodeAssistant.TUI/CodeAssistant.TUI.csproj" />
+  <Project Path="CodeAssistant.WebApp/CodeAssistant.WebApp.csproj" />
 </Solution>
