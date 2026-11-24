@@ -19,8 +19,12 @@ export function ChatView({ connected }: { connected: boolean }) {
   const subscription = useRef<ISubscription<ChatChunk> | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: 'end' }), [entries]);
-  useEffect(() => () => subscription.current?.dispose(), []);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: 'end' });
+  }, [entries]);
+  useEffect(() => () => {
+    subscription.current?.dispose();
+  }, []);
 
   function append(role: Entry['role'], text: string) {
     const entry = { id: nextId++, role, text };

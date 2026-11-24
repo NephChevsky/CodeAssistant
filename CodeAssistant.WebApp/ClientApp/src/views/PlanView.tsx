@@ -28,7 +28,9 @@ export function PlanView({ connected }: { connected: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: 'end' }), [entries.length]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: 'end' });
+  }, [entries.length]);
 
   useEffect(() => {
     const add = (entry: Entry) => setEntries((e) => [...e, entry]);

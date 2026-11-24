@@ -19,7 +19,7 @@ dotnet user-secrets set ConnectionStrings:Copilot "YOUR_TOKEN" --project CodeAss
 dotnet run --project CodeAssistant.WebApp
 ```
 
-In development, the Vite dev server is started automatically and the browser opens `http://localhost:5173`. `dotnet publish` builds the React app into `wwwroot`.
+In development, the Vite dev server is started automatically and the browser opens `http://localhost:5173`. `dotnet publish` builds the React app into `wwwroot`; the published app reads the token from the `ConnectionStrings__Copilot` environment variable.
 
 ## Releases
 
