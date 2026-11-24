@@ -18,14 +18,16 @@ namespace CodeAssistant.WebApp.Hubs
         private readonly AssistantConnections _connections;
         private readonly IHubContext<AssistantHub> _hubContext;
         private readonly ILogger<PlanningRun> _planningLogger;
+        private readonly IConfiguration _configuration;
 
-        public AssistantHub(ILLMService llm, IFeaturePlanner planner, AssistantConnections connections, IHubContext<AssistantHub> hubContext, ILogger<PlanningRun> planningLogger)
+        public AssistantHub(ILLMService llm, IFeaturePlanner planner, AssistantConnections connections, IHubContext<AssistantHub> hubContext, ILogger<PlanningRun> planningLogger, IConfiguration configuration)
         {
             _llm = llm;
             _planner = planner;
             _connections = connections;
             _hubContext = hubContext;
             _planningLogger = planningLogger;
+            _configuration = configuration;
         }
 
         private ConnectionState State => _connections.Get(Context.ConnectionId);
@@ -46,6 +48,22 @@ namespace CodeAssistant.WebApp.Hubs
 
             ChatConversation chat = State.Chat ?? throw new HubException("Start a chat first.");
             return chat.SendAsync(message, cancellationToken);
+        }
+
+        /// <summary>Git repositories directly under the configured DevFolder (empty when it is not set or does not exist).</summary>
+        public IReadOnlyList<RepositoryInfo> GetRepositories()
+        {
+            string? devFolder = _configuration["DevFolder"];
+            if (string.IsNullOrWhiteSpace(devFolder) || !Directory.Exists(devFolder))
+            {
+                return [];
+            }
+
+            return new DirectoryInfo(devFolder).EnumerateDirectories()
+                .Where(d => Path.Exists(Path.Combine(d.FullName, ".git")))
+                .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(d => new RepositoryInfo(d.Name, d.FullName))
+                .ToList();
         }
 
         public async Task StartPlan(PlanSettings settings)

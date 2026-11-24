@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { connection, errorMessage } from '../hub';
-import type { PendingQuestion, PlanningPhase, SavedPlan } from '../types';
+import type { PendingQuestion, PlanningPhase, RepositoryInfo, SavedPlan } from '../types';
 import { Markdown } from '../components/Markdown';
 import { defaultModelSettings, ModelPicker, type ModelSettings } from '../components/ModelPicker';
 
@@ -20,6 +20,7 @@ let nextId = 0;
 
 export function PlanView({ connected }: { connected: boolean }) {
   const [repositoryRoot, setRepositoryRoot] = useState(() => localStorage.getItem(repositoryKey) ?? '');
+  const [repositories, setRepositories] = useState<RepositoryInfo[]>([]);
   const [description, setDescription] = useState('');
   const [settings, setSettings] = useState<ModelSettings>(defaultModelSettings);
   const [status, setStatus] = useState<Status>('idle');
@@ -31,6 +32,21 @@ export function PlanView({ connected }: { connected: boolean }) {
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' });
   }, [entries.length]);
+
+  useEffect(() => {
+    if (!connected) {
+      return;
+    }
+    connection
+      .invoke<RepositoryInfo[]>('GetRepositories')
+      .then((found) => {
+        setRepositories(found);
+        if (found.length > 0) {
+          setRepositoryRoot((current) => found.find((r) => r.path.toLowerCase() === current.trim().toLowerCase())?.path ?? '');
+        }
+      })
+      .catch((err) => setError(errorMessage(err)));
+  }, [connected]);
 
   useEffect(() => {
     const add = (entry: Entry) => setEntries((e) => [...e, entry]);
@@ -86,12 +102,25 @@ export function PlanView({ connected }: { connected: boolean }) {
       <div className="plan-form">
         <label className="wide">
           Repository
-          <input
-            value={repositoryRoot}
-            placeholder="Absolute path of the repository, e.g. D:\dev\MyProject"
-            disabled={running}
-            onChange={(e) => setRepositoryRoot(e.target.value)}
-          />
+          {repositories.length > 0 ? (
+            <select value={repositoryRoot} disabled={running} onChange={(e) => setRepositoryRoot(e.target.value)}>
+              <option value="" disabled>
+                Select a repository
+              </option>
+              {repositories.map((r) => (
+                <option key={r.path} value={r.path}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={repositoryRoot}
+              placeholder="Absolute path of the repository, e.g. D:\dev\MyProject"
+              disabled={running}
+              onChange={(e) => setRepositoryRoot(e.target.value)}
+            />
+          )}
         </label>
         <label className="wide">
           Feature

@@ -18,6 +18,11 @@ export type SavedPlan = {
   jsonPath: string;
 };
 
+export type RepositoryInfo = {
+  name: string;
+  path: string;
+};
+
 export const models = ['claude-sonnet-5.5', 'claude-opus-5.5'];
 
 export const reasoningEfforts = ['low', 'medium', 'high'];

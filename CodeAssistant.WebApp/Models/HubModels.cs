@@ -16,4 +16,6 @@ namespace CodeAssistant.WebApp.Models
     public sealed record PendingQuestion(string Id, string Question, IReadOnlyList<string> Choices, bool AllowFreeform);
 
     public sealed record SavedPlan(string MarkdownPath, string JsonPath);
+
+    public sealed record RepositoryInfo(string Name, string Path);
 }
