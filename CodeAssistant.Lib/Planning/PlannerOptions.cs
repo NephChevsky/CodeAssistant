@@ -2,8 +2,8 @@ namespace CodeAssistant.Lib.Planning
 {
     public class PlannerOptions
     {
-        /// <summary>Root of the repository the planner may read. Nothing outside it is accessible.</summary>
-        public string RepositoryRoot { get; set; } = Environment.CurrentDirectory;
+        /// <summary>Root of the repository the planner may read. Nothing outside it is accessible. Null gives read access to the whole file system through absolute paths.</summary>
+        public string? RepositoryRoot { get; set; } = Environment.CurrentDirectory;
 
         /// <summary>Model requested from the LLM provider. Provider default when null.</summary>
         public string? Model { get; set; }
@@ -11,7 +11,7 @@ namespace CodeAssistant.Lib.Planning
         /// <summary>Reasoning effort requested from the model (e.g. "low", "medium", "high"). Provider default when null.</summary>
         public string? ReasoningEffort { get; set; }
 
-        /// <summary>Directory where approved plans are written. Defaults to &lt;RepositoryRoot&gt;/plans.</summary>
+        /// <summary>Directory where approved plans are written. Defaults to &lt;RepositoryRoot&gt;/plans, or Documents/CodeAssistant/plans without a repository root.</summary>
         public string? PlansOutputDirectory { get; set; }
 
         /// <summary>Directory names hidden from the planner's tools, at any depth.</summary>
@@ -32,7 +32,10 @@ namespace CodeAssistant.Lib.Planning
 
         internal string GetPlansOutputDirectory()
         {
-            return Path.GetFullPath(PlansOutputDirectory ?? Path.Combine(RepositoryRoot, "plans"));
+            string defaultDirectory = RepositoryRoot is null
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CodeAssistant", "plans")
+                : Path.Combine(RepositoryRoot, "plans");
+            return Path.GetFullPath(PlansOutputDirectory ?? defaultDirectory);
         }
     }
 }

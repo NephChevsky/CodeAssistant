@@ -2,8 +2,10 @@
 using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
 using CodeAssistant.Lib;
 using CodeAssistant.Lib.Planning;
+using CodeAssistant.Lib.Tools;
 using CopilotLib;
 using LLMLib;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +31,10 @@ namespace CodeAssistant.TUI
             "but you must never modify anything (create, edit, delete or move files, run commands with side effects, change configuration or data) " +
             "without first asking the user for explicit permission and receiving it.";
 
+        private const string FileAccessSystemMessage =
+            "You can read any file on this machine with the list_dir, read_file, grep_search and file_search tools, always using absolute paths " +
+            "(list_dir without a path lists the drives). You have no tool to modify files or run commands.";
+
         public static async Task Main(string[] args)
         {
             string token = PromptForToken();
@@ -44,10 +50,10 @@ namespace CodeAssistant.TUI
             });
             builder.Logging.ClearProviders();
             builder.UseSerilogLib(writeToConsole: false);
-            builder.Services.AddCopilotLib(options => options.WorkingDirectory = Environment.CurrentDirectory);
+            builder.Services.AddCopilotLib();
             builder.Services.AddCodeAssistantLib(options =>
             {
-                options.RepositoryRoot = Environment.CurrentDirectory;
+                options.RepositoryRoot = null;
                 options.Model = model;
                 options.ReasoningEffort = reasoningEffort;
             });
@@ -68,7 +74,8 @@ namespace CodeAssistant.TUI
             }
             else
             {
-                await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, exit.Token);
+                IReadOnlyList<AIFunction> tools = ReadOnlyRepositoryTools.Create(new RepositorySandbox(null, []), host.Services.GetRequiredService<PlannerOptions>());
+                await RunChatAsync(llm, mode == ProductionMode, model, reasoningEffort, tools, exit.Token);
             }
 
             AnsiConsole.MarkupLine("[grey]Goodbye.[/]");
@@ -103,10 +110,11 @@ namespace CodeAssistant.TUI
             };
         }
 
-        private static async Task RunChatAsync(ILLMService llm, bool productionMode, string model, string reasoningEffort, CancellationToken cancellationToken)
+        private static async Task RunChatAsync(ILLMService llm, bool productionMode, string model, string reasoningEffort, IReadOnlyList<AIFunction> tools, CancellationToken cancellationToken)
         {
+            string systemMessage = productionMode ? ProductionSystemMessage + "\n\n" + FileAccessSystemMessage : FileAccessSystemMessage;
             await using ILLMSession session = await llm.CreateSessionAsync(
-                new LLMSessionOptions { SystemMessage = productionMode ? ProductionSystemMessage : null, Model = model, ReasoningEffort = reasoningEffort },
+                new LLMSessionOptions { SystemMessage = systemMessage, Model = model, ReasoningEffort = reasoningEffort, Tools = tools },
                 cancellationToken);
 
             while (!cancellationToken.IsCancellationRequested)

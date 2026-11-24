@@ -40,7 +40,7 @@ namespace CodeAssistant.Lib.Planning
 
             await using ILLMSession session = await _llm.CreateSessionAsync(new LLMSessionOptions
             {
-                SystemMessage = PlannerPrompts.SystemMessage,
+                SystemMessage = PlannerPrompts.SystemMessage(sandbox.Root is not null),
                 Model = _options.Model,
                 ReasoningEffort = _options.ReasoningEffort,
                 Tools = tools,

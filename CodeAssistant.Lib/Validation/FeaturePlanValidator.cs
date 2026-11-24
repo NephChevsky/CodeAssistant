@@ -83,7 +83,8 @@ namespace CodeAssistant.Lib.Validation
                 {
                     if (!FileExists(sandbox, file.Path))
                     {
-                        errors.Add($"relevant file '{file.Path}' is marked {file.Change.ToString().ToLowerInvariant()} but does not exist in the repository (use a path relative to the repository root, or mark it create).");
+                        string hint = sandbox.Root is null ? "use an absolute path" : "use a path relative to the repository root";
+                        errors.Add($"relevant file '{file.Path}' is marked {file.Change.ToString().ToLowerInvariant()} but does not exist ({hint}, or mark it create).");
                     }
                 }
             }

@@ -1,15 +1,24 @@
 namespace CodeAssistant.Lib.Tools
 {
-    /// <summary>Confines file system access to a repository root, hiding excluded directories and links that lead outside the root.</summary>
+    /// <summary>
+    /// Confines file system access to a repository root, hiding excluded directories and links that lead outside the root.
+    /// Without a root, the whole file system is accessible through absolute paths.
+    /// </summary>
     public sealed class RepositorySandbox
     {
         private static readonly StringComparison PathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
         private readonly HashSet<string> _excludedDirectories;
-        private readonly string _rootWithSeparator;
+        private readonly string? _rootWithSeparator;
 
-        public RepositorySandbox(string root, IEnumerable<string> excludedDirectories)
+        public RepositorySandbox(string? root, IEnumerable<string> excludedDirectories)
         {
+            _excludedDirectories = new HashSet<string>(excludedDirectories, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+            if (root is null)
+            {
+                return;
+            }
+
             string fullRoot = Path.GetFullPath(root);
             if (!Directory.Exists(fullRoot))
             {
@@ -18,15 +27,34 @@ namespace CodeAssistant.Lib.Tools
 
             Root = Path.TrimEndingDirectorySeparator(fullRoot);
             _rootWithSeparator = Path.EndsInDirectorySeparator(Root) ? Root : Root + Path.DirectorySeparatorChar;
-            _excludedDirectories = new HashSet<string>(excludedDirectories, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         }
 
-        public string Root { get; }
+        /// <summary>Repository root, or null when the whole file system is accessible.</summary>
+        public string? Root { get; }
 
-        /// <summary>Resolves a repository-relative path to a full path, or throws <see cref="UnauthorizedAccessException"/> when it is not accessible.</summary>
+        /// <summary>
+        /// Resolves an absolute or repository-relative path to a full path, or throws <see cref="UnauthorizedAccessException"/> when it is not accessible.
+        /// Without a root, the path must be absolute.
+        /// </summary>
         public string Resolve(string? path)
         {
             string trimmed = path?.Trim() ?? string.Empty;
+            if (Root is null)
+            {
+                if (!Path.IsPathFullyQualified(trimmed))
+                {
+                    throw new ArgumentException($"Path '{path}' must be absolute.");
+                }
+
+                string absolutePath = Path.GetFullPath(trimmed);
+                if (IsExcluded(absolutePath))
+                {
+                    throw new UnauthorizedAccessException($"Path '{path}' is in an excluded directory.");
+                }
+
+                return absolutePath;
+            }
+
             string fullPath = trimmed.Length == 0 || trimmed == "." || trimmed == "/"
                 ? Root
                 : Path.GetFullPath(Path.Combine(Root, trimmed.TrimStart('/', '\\')));
@@ -65,9 +93,14 @@ namespace CodeAssistant.Lib.Tools
             return fullPath;
         }
 
-        /// <summary>Returns the path relative to the root, with forward slashes.</summary>
+        /// <summary>Returns the path relative to the root, with forward slashes, or the full path when there is no root.</summary>
         public string ToRelative(string fullPath)
         {
+            if (Root is null)
+            {
+                return fullPath;
+            }
+
             string relative = Path.GetRelativePath(Root, fullPath);
             return relative == "." ? "." : relative.Replace(Path.DirectorySeparatorChar, '/');
         }
@@ -124,13 +157,14 @@ namespace CodeAssistant.Lib.Tools
 
         private bool IsInsideRoot(string fullPath)
         {
-            return string.Equals(Path.TrimEndingDirectorySeparator(fullPath), Root, PathComparison)
-                || fullPath.StartsWith(_rootWithSeparator, PathComparison);
+            return Root is null
+                || string.Equals(Path.TrimEndingDirectorySeparator(fullPath), Root, PathComparison)
+                || fullPath.StartsWith(_rootWithSeparator!, PathComparison);
         }
 
         private bool IsExcluded(string fullPath)
         {
-            string relative = Path.GetRelativePath(Root, fullPath);
+            string relative = Root is null ? fullPath : Path.GetRelativePath(Root, fullPath);
             string[] segments = relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
             // The last segment is only checked when it is a directory: a file may share an excluded directory's name.
             for (int i = 0; i < segments.Length; i++)
@@ -147,7 +181,7 @@ namespace CodeAssistant.Lib.Tools
 
         private bool IsEscapingLink(FileSystemInfo info)
         {
-            if (!info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            if (Root is null || !info.Attributes.HasFlag(FileAttributes.ReparsePoint))
             {
                 return false;
             }

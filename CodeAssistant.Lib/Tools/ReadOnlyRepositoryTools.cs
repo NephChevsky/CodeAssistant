@@ -7,7 +7,7 @@ using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace CodeAssistant.Lib.Tools
 {
-    /// <summary>Read-only repository tools exposed to the planning agent. Every path goes through a <see cref="RepositorySandbox"/>.</summary>
+    /// <summary>Read-only file system tools. Every path goes through a <see cref="RepositorySandbox"/>.</summary>
     public sealed class ReadOnlyRepositoryTools
     {
         public const string ListDirName = "list_dir";
@@ -18,6 +18,7 @@ namespace CodeAssistant.Lib.Tools
         private const int MaxListEntries = 1000;
         private const int MaxLineLength = 300;
         private const int BinaryProbeBytes = 8000;
+        private const string SearchDirectoryDescription = "Directory to search recursively, absolute or relative to the repository root. Defaults to the repository root; required when there is no repository root.";
 
         private readonly RepositorySandbox _sandbox;
         private readonly PlannerOptions _options;
@@ -35,18 +36,23 @@ namespace CodeAssistant.Lib.Tools
             ReadOnlyRepositoryTools tools = new(sandbox, options, onInvoked);
             return
             [
-                AIFunctionFactory.Create(tools.ListDir, ListDirName, "List the files and directories of a repository directory. Directories end with '/'."),
-                AIFunctionFactory.Create(tools.ReadFile, ReadFileName, "Read a range of lines of a repository text file. Lines are prefixed with their 1-based number."),
-                AIFunctionFactory.Create(tools.GrepSearch, GrepSearchName, "Search repository text files for a case-insensitive text or regular expression. Returns 'path:line: text' matches."),
-                AIFunctionFactory.Create(tools.FileSearch, FileSearchName, "Find repository files whose relative path matches a glob pattern, e.g. '**/*.cs' or 'src/**/Program.cs'."),
+                AIFunctionFactory.Create(tools.ListDir, ListDirName, "List the files and directories of a directory. Directories end with '/'."),
+                AIFunctionFactory.Create(tools.ReadFile, ReadFileName, "Read a range of lines of a text file. Lines are prefixed with their 1-based number."),
+                AIFunctionFactory.Create(tools.GrepSearch, GrepSearchName, "Search the text files of a directory tree for a case-insensitive text or regular expression. Returns 'path:line: text' matches."),
+                AIFunctionFactory.Create(tools.FileSearch, FileSearchName, "Find the files of a directory tree whose path relative to that directory matches a glob pattern, e.g. '**/*.cs' or 'src/**/Program.cs'."),
             ];
         }
 
-        public string ListDir([Description("Directory path relative to the repository root. Use '.' for the root.")] string path = ".")
+        public string ListDir([Description("Directory path, absolute or relative to the repository root. Defaults to the repository root, or to the list of drives when there is no repository root.")] string path = ".")
         {
             _onInvoked?.Invoke(ListDirName, path);
             return Run(() =>
             {
+                if (_sandbox.Root is null && (string.IsNullOrWhiteSpace(path) || path.Trim() == "."))
+                {
+                    return string.Join(Environment.NewLine, DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => d.RootDirectory.FullName));
+                }
+
                 string fullPath = _sandbox.Resolve(path);
                 if (!Directory.Exists(fullPath))
                 {
@@ -75,7 +81,7 @@ namespace CodeAssistant.Lib.Tools
         }
 
         public string ReadFile(
-            [Description("File path relative to the repository root.")] string path,
+            [Description("File path, absolute or relative to the repository root.")] string path,
             [Description("First line to read, 1-based.")] int startLine = 1,
             [Description("Last line to read, inclusive. Defaults to the end of the file, within the line limit.")] int? endLine = null)
         {
@@ -127,9 +133,10 @@ namespace CodeAssistant.Lib.Tools
         public string GrepSearch(
             [Description("Text or regular expression to search for (case-insensitive).")] string query,
             [Description("True when query is a regular expression.")] bool isRegex = false,
-            [Description("Optional glob restricting the searched files, e.g. '**/*.cs'.")] string? includePattern = null)
+            [Description("Optional glob restricting the searched files, relative to the searched directory, e.g. '**/*.cs'.")] string? includePattern = null,
+            [Description(SearchDirectoryDescription)] string directory = ".")
         {
-            _onInvoked?.Invoke(GrepSearchName, includePattern is null ? query : $"{query} in {includePattern}");
+            _onInvoked?.Invoke(GrepSearchName, (includePattern is null ? query : $"{query} in {includePattern}") + $" ({directory})");
             return Run(() =>
             {
                 if (string.IsNullOrEmpty(query))
@@ -137,18 +144,19 @@ namespace CodeAssistant.Lib.Tools
                     return "Error: query is empty.";
                 }
 
+                string searchRoot = ResolveSearchDirectory(directory);
                 Regex regex = new(isRegex ? query : Regex.Escape(query), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, _options.RegexTimeout);
                 Matcher? matcher = CreateMatcher(includePattern);
                 StringBuilder result = new();
                 int count = 0;
-                foreach (string fullPath in _sandbox.EnumerateFiles(_sandbox.Root))
+                foreach (string fullPath in _sandbox.EnumerateFiles(searchRoot))
                 {
-                    string relative = _sandbox.ToRelative(fullPath);
-                    if ((matcher is not null && !matcher.Match(relative).HasMatches) || new FileInfo(fullPath).Length > _options.MaxFileBytes || IsBinary(fullPath))
+                    if ((matcher is not null && !matcher.Match(ToSearchRelative(searchRoot, fullPath)).HasMatches) || new FileInfo(fullPath).Length > _options.MaxFileBytes || IsBinary(fullPath))
                     {
                         continue;
                     }
 
+                    string relative = _sandbox.ToRelative(fullPath);
                     int lineNumber = 0;
                     foreach (string line in File.ReadLines(fullPath))
                     {
@@ -174,15 +182,18 @@ namespace CodeAssistant.Lib.Tools
             });
         }
 
-        public string FileSearch([Description("Glob pattern matched against paths relative to the repository root, e.g. '**/*.csproj'.")] string pattern)
+        public string FileSearch(
+            [Description("Glob pattern matched against paths relative to the searched directory, e.g. '**/*.csproj'.")] string pattern,
+            [Description(SearchDirectoryDescription)] string directory = ".")
         {
-            _onInvoked?.Invoke(FileSearchName, pattern);
+            _onInvoked?.Invoke(FileSearchName, $"{pattern} ({directory})");
             return Run(() =>
             {
                 Matcher matcher = CreateMatcher(pattern) ?? throw new ArgumentException("Pattern is empty.");
-                List<string> matches = [.. _sandbox.EnumerateFiles(_sandbox.Root)
+                string searchRoot = ResolveSearchDirectory(directory);
+                List<string> matches = [.. _sandbox.EnumerateFiles(searchRoot)
+                    .Where(p => matcher.Match(ToSearchRelative(searchRoot, p)).HasMatches)
                     .Select(_sandbox.ToRelative)
-                    .Where(p => matcher.Match(p).HasMatches)
                     .Take(_options.MaxSearchResults + 1)];
                 if (matches.Count == 0)
                 {
@@ -202,6 +213,17 @@ namespace CodeAssistant.Lib.Tools
 
                 return result.ToString();
             });
+        }
+
+        private string ResolveSearchDirectory(string directory)
+        {
+            string fullPath = _sandbox.Resolve(directory);
+            return Directory.Exists(fullPath) ? fullPath : throw new ArgumentException($"'{directory}' is not a directory.");
+        }
+
+        private static string ToSearchRelative(string searchRoot, string fullPath)
+        {
+            return Path.GetRelativePath(searchRoot, fullPath).Replace(Path.DirectorySeparatorChar, '/');
         }
 
         private static Matcher? CreateMatcher(string? pattern)
