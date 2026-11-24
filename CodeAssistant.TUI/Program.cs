@@ -32,8 +32,9 @@ namespace CodeAssistant.TUI
             "without first asking the user for explicit permission and receiving it.";
 
         private const string FileAccessSystemMessage =
-            "You can read any file on this machine with the list_dir, read_file, grep_search and file_search tools, always using absolute paths " +
-            "(list_dir without a path lists the drives). You have no tool to modify files or run commands.";
+            $"You can read any file on this machine with the {ReadOnlyRepositoryTools.ListDirName}, {ReadOnlyRepositoryTools.ReadFileName}, {ReadOnlyRepositoryTools.GrepSearchName} " +
+            $"and {ReadOnlyRepositoryTools.FileSearchName} tools, always using absolute paths ({ReadOnlyRepositoryTools.ListDirName} without a path lists the drives). " +
+            "You have no tool to modify files or run commands.";
 
         public static async Task Main(string[] args)
         {
