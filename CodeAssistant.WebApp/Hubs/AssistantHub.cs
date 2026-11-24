@@ -9,7 +9,8 @@ namespace CodeAssistant.WebApp.Hubs
 {
     /// <summary>
     /// Chat: <see cref="StartChat"/> then <see cref="SendMessage"/> (streamed).
-    /// Planning: <see cref="StartPlan"/>, then answer the PlanQuestion / PlanReview events until PlanCompleted, PlanFailed or PlanCancelled.
+    /// Planning: <see cref="StartPlan"/>, then answer the PlanQuestion events and the PhaseReview / PlanReview events (with <see cref="ReviewPlan"/>)
+    /// until PlanCompleted, PlanFailed or PlanCancelled.
     /// </summary>
     public sealed class AssistantHub : Hub
     {

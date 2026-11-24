@@ -155,7 +155,8 @@ namespace CodeAssistant.Lib.Validation
             }
         }
 
-        private static bool FileExists(RepositorySandbox sandbox, string path)
+        /// <summary>Whether an absolute or repository-relative file or directory exists and is accessible.</summary>
+        internal static bool FileExists(RepositorySandbox sandbox, string path)
         {
             try
             {

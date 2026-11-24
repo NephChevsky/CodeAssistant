@@ -8,7 +8,7 @@ type Entry =
   | { id: number; kind: 'message'; markdown: string }
   | { id: number; kind: 'tool'; name: string; summary: string }
   | { id: number; kind: 'question'; question: PendingQuestion; answer?: string }
-  | { id: number; kind: 'review'; markdown: string; verdict?: string }
+  | { id: number; kind: 'review'; title: string; approveLabel: string; markdown: string; verdict?: string }
   | { id: number; kind: 'status'; tone: 'info' | 'success' | 'error'; text: string };
 
 type Status = 'idle' | 'running' | 'finished';
@@ -17,6 +17,10 @@ const phases: PlanningPhase[] = ['discovery', 'alignment', 'design', 'refinement
 const repositoryKey = 'codeassistant.plan.repositoryRoot';
 
 let nextId = 0;
+
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export function PlanView({ connected }: { connected: boolean }) {
   const [repositoryRoot, setRepositoryRoot] = useState(() => localStorage.getItem(repositoryKey) ?? '');
@@ -60,7 +64,10 @@ export function PlanView({ connected }: { connected: boolean }) {
       ['PlanMessage', (markdown: string) => add({ id: nextId++, kind: 'message', markdown })],
       ['PlanTool', (name: string, summary: string) => add({ id: nextId++, kind: 'tool', name, summary })],
       ['PlanQuestion', (question: PendingQuestion) => add({ id: nextId++, kind: 'question', question })],
-      ['PlanReview', (markdown: string) => add({ id: nextId++, kind: 'review', markdown })],
+      ['PhaseReview', (p: PlanningPhase, markdown: string) =>
+        add({ id: nextId++, kind: 'review', title: `${capitalize(p)} complete. Agree to move on?`, approveLabel: 'Continue', markdown })],
+      ['PlanReview', (markdown: string) =>
+        add({ id: nextId++, kind: 'review', title: 'Plan for review', approveLabel: 'Approve and save', markdown })],
       ['PlanCompleted', (saved: SavedPlan) => finish('success', `Plan saved to ${saved.markdownPath} and ${saved.jsonPath}`)],
       ['PlanFailed', (message: string) => finish('error', `Planning failed: ${message}`)],
       ['PlanCancelled', () => finish('info', 'Planning cancelled.')],
@@ -276,7 +283,7 @@ function ReviewCard({ entry, active, onReviewed }: ReviewProps) {
     setError(null);
     try {
       await connection.invoke('ReviewPlan', approved, approved ? null : feedback.trim());
-      onReviewed(approved ? 'Approved' : `Changes requested: ${feedback.trim()}`);
+      onReviewed(approved ? 'Agreed' : `Changes requested: ${feedback.trim()}`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -286,7 +293,7 @@ function ReviewCard({ entry, active, onReviewed }: ReviewProps) {
 
   return (
     <div className="card review">
-      <p className="card-title">Plan for review</p>
+      <p className="card-title">{entry.title}</p>
       <div className="plan-document">
         <Markdown text={entry.markdown} />
       </div>
@@ -301,7 +308,7 @@ function ReviewCard({ entry, active, onReviewed }: ReviewProps) {
                 Request changes
               </button>
               <button className="primary" disabled={sending} onClick={() => review(true)}>
-                Approve and save
+                {entry.approveLabel}
               </button>
             </div>
           </div>

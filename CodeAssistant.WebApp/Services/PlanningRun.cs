@@ -64,13 +64,23 @@ namespace CodeAssistant.WebApp.Services
             }
         }
 
-        public async Task<PlanReview> ReviewPlanAsync(FeaturePlan plan, string markdown, CancellationToken cancellationToken)
+        public Task<PlanReview> ReviewPhaseAsync(PlanningPhase phase, string markdown, CancellationToken cancellationToken)
+        {
+            return WaitForReviewAsync("PhaseReview", [phase, markdown], cancellationToken);
+        }
+
+        public Task<PlanReview> ReviewPlanAsync(FeaturePlan plan, string markdown, CancellationToken cancellationToken)
+        {
+            return WaitForReviewAsync("PlanReview", [markdown], cancellationToken);
+        }
+
+        private async Task<PlanReview> WaitForReviewAsync(string method, object?[] args, CancellationToken cancellationToken)
         {
             TaskCompletionSource<PlanReview> review = new(TaskCreationOptions.RunContinuationsAsynchronously);
             Volatile.Write(ref _review, review);
             try
             {
-                Send("PlanReview", markdown);
+                Send(method, args);
                 return await review.Task.WaitAsync(cancellationToken);
             }
             finally
@@ -91,12 +101,12 @@ namespace CodeAssistant.WebApp.Services
         {
             if (!approved && string.IsNullOrWhiteSpace(feedback))
             {
-                throw new HubException("Explain what to change in the plan.");
+                throw new HubException("Explain what should change.");
             }
 
             if (Interlocked.Exchange(ref _review, null) is not { } review || !review.TrySetResult(new PlanReview(approved, feedback)))
             {
-                throw new HubException("No plan is waiting for review.");
+                throw new HubException("Nothing is waiting for review.");
             }
         }
 

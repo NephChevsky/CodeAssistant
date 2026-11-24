@@ -23,10 +23,8 @@ namespace CodeAssistant.Lib.Planning
 
         public int MaxSearchResults { get; set; } = 100;
 
-        public int MaxClarifyingQuestions { get; set; } = 5;
-
-        /// <summary>Number of reminders sent when the agent ends a design or revision turn without submitting a plan.</summary>
-        public int MaxSubmitRetries { get; set; } = 2;
+        /// <summary>Number of reminders sent when the agent ends a turn without declaring the current phase complete (or submitting the plan).</summary>
+        public int MaxCompletionReminders { get; set; } = 2;
 
         public TimeSpan RegexTimeout { get; set; } = TimeSpan.FromSeconds(2);
 

@@ -1,3 +1,4 @@
+using CodeAssistant.Lib.Models;
 using CodeAssistant.Lib.Tools;
 
 namespace CodeAssistant.Lib.Planning
@@ -22,6 +23,8 @@ namespace CodeAssistant.Lib.Planning
                 "Tools:\n" +
                 $"- Explore with {ReadOnlyRepositoryTools.ListDirName}, {ReadOnlyRepositoryTools.FileSearchName}, {ReadOnlyRepositoryTools.GrepSearchName} and {ReadOnlyRepositoryTools.ReadFileName}. {paths}\n" +
                 $"- Ask the user with {PlannerInteractionTools.AskUserName} only for decisions that materially change the plan and cannot be found in the code. Offer concrete choices when possible.\n" +
+                $"- You decide when a phase is done: declare Discovery complete with {PlannerInteractionTools.CompleteDiscoveryName} and Alignment with {PlannerInteractionTools.CompleteAlignmentName}. " +
+                "The user then agrees or sends you back with feedback. Never move on to a later phase on your own.\n" +
                 $"- Submit the plan only by calling {PlannerInteractionTools.SubmitPlanName}. Never write the plan as plain text.\n\n" +
                 "Plan rules:\n" +
                 "- Phases are ordered; each has a goal and concrete tasks.\n" +
@@ -39,15 +42,28 @@ namespace CodeAssistant.Lib.Planning
             return "Feature request:\n" + featureDescription + "\n\n" +
                 "Phase 1 - Discovery. Explore the repository to understand everything relevant to this request: entry points, existing patterns, " +
                 "conventions, similar features, configuration and tests. Do not ask questions and do not write a plan yet. " +
-                "End with a concise summary of your findings: relevant files, patterns to follow, constraints, and the ambiguities you identified.";
+                $"When you understand everything relevant, call {PlannerInteractionTools.CompleteDiscoveryName} with a concise summary of your findings, " +
+                "the relevant files, and the open questions you identified.";
         }
 
-        public static string Alignment(int maxQuestions)
+        public const string Alignment =
+            "Phase 2 - Alignment. For open questions that materially change the plan, ask the user with " +
+            $"{PlannerInteractionTools.AskUserName} (one question per call, with suggested choices). " +
+            "Do not ask about anything you can find in the code. " +
+            $"When every decision is settled, call {PlannerInteractionTools.CompleteAlignmentName} with the decisions and your assumptions. " +
+            "If nothing is ambiguous, call it right away with your assumptions.";
+
+        public static string CompletionReminder(PlanningPhase phase)
         {
-            return "Phase 2 - Alignment. For ambiguities that materially change the plan, ask the user with " +
-                $"{PlannerInteractionTools.AskUserName} (one question per call, at most {maxQuestions} questions, with suggested choices). " +
-                "Do not ask about anything you can find in the code. Then briefly summarize the resulting decisions. " +
-                "If nothing is ambiguous, say so and summarize your assumptions.";
+            string tool = PlannerInteractionTools.CompletionToolName(phase);
+            return $"You have not declared the {phase} phase complete. If it is, call {tool} now; otherwise continue the {phase} phase and call {tool} when you are done.";
+        }
+
+        public static string PhaseFeedback(PlanningPhase phase, string feedback)
+        {
+            return $"The user does not agree that the {phase} phase is complete:\n" + feedback + "\n\n" +
+                $"Continue the {phase} phase accordingly (explore further or ask questions as needed), " +
+                $"then call {PlannerInteractionTools.CompletionToolName(phase)} again with the full updated summary.";
         }
 
         public const string Design =

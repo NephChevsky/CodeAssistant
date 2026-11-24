@@ -7,7 +7,10 @@ using Microsoft.Extensions.AI;
 
 namespace CodeAssistant.Lib.Planning
 {
-    /// <summary>Drives a planning agent through Discovery, Alignment, Design and Refinement in a single LLM session.</summary>
+    /// <summary>
+    /// Drives a planning agent through Discovery, Alignment, Design and Refinement in a single LLM session.
+    /// A phase ends only when the agent declares it complete (completion tool or submit_plan) and the user agrees.
+    /// </summary>
     public sealed class FeaturePlanner : IFeaturePlanner
     {
         private const int MaxSlugLength = 60;
@@ -29,7 +32,7 @@ namespace CodeAssistant.Lib.Planning
 
             RepositorySandbox sandbox = new(request.RepositoryRoot ?? _options.RepositoryRoot, _options.ExcludedDirectories);
             MessageBuffer buffer = new(interaction);
-            PlannerInteractionTools interactionTools = new(interaction, sandbox, _options.MaxClarifyingQuestions, buffer.Flush, cancellationToken);
+            PlannerInteractionTools interactionTools = new(interaction, sandbox, buffer.Flush, cancellationToken);
             List<AIFunction> tools =
             [
                 .. ReadOnlyRepositoryTools.Create(sandbox, _options, (name, summary) =>
@@ -48,16 +51,15 @@ namespace CodeAssistant.Lib.Planning
                 Tools = tools,
             }, cancellationToken);
 
-            interaction.OnPhaseChanged(PlanningPhase.Discovery);
-            await AskAsync(session, PlannerPrompts.Discovery(request.Description), buffer, cancellationToken);
-
-            interaction.OnPhaseChanged(PlanningPhase.Alignment);
-            await AskAsync(session, PlannerPrompts.Alignment(_options.MaxClarifyingQuestions), buffer, cancellationToken);
+            await RunPhaseAsync(session, PlanningPhase.Discovery, PlannerPrompts.Discovery(request.Description), interactionTools, interaction, buffer, cancellationToken);
+            await RunPhaseAsync(session, PlanningPhase.Alignment, PlannerPrompts.Alignment, interactionTools, interaction, buffer, cancellationToken);
 
             interaction.OnPhaseChanged(PlanningPhase.Design);
-            FeaturePlan plan = await RequestPlanAsync(session, PlannerPrompts.Design, interactionTools, buffer, cancellationToken);
+            interactionTools.Phase = PlanningPhase.Design;
+            FeaturePlan plan = await AwaitCompletionAsync(session, PlannerPrompts.Design, interactionTools.TakeSubmittedPlan, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
 
             interaction.OnPhaseChanged(PlanningPhase.Refinement);
+            interactionTools.Phase = PlanningPhase.Refinement;
             string markdown;
             while (true)
             {
@@ -68,8 +70,7 @@ namespace CodeAssistant.Lib.Planning
                     break;
                 }
 
-                string feedback = string.IsNullOrWhiteSpace(review.Feedback) ? "Improve the plan." : review.Feedback;
-                plan = await RequestPlanAsync(session, PlannerPrompts.Revision(feedback), interactionTools, buffer, cancellationToken);
+                plan = await AwaitCompletionAsync(session, PlannerPrompts.Revision(GetFeedback(review)), interactionTools.TakeSubmittedPlan, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
             }
 
             (string markdownPath, string jsonPath) = GetPlanPaths(_options.GetPlansOutputDirectory(plan.RepositoryRoot), plan.Title, DateTime.Now);
@@ -126,23 +127,49 @@ namespace CodeAssistant.Lib.Planning
             return result.Length == 0 ? "plan" : result;
         }
 
-        private async Task<FeaturePlan> RequestPlanAsync(ILLMSession session, string prompt, PlannerInteractionTools interactionTools, MessageBuffer buffer, CancellationToken cancellationToken)
+        /// <summary>Runs a reviewed phase: the agent works until it declares the phase complete, then the user approves or sends it back with feedback.</summary>
+        private async Task RunPhaseAsync(ILLMSession session, PlanningPhase phase, string prompt, PlannerInteractionTools interactionTools, IPlanningInteraction interaction, MessageBuffer buffer, CancellationToken cancellationToken)
+        {
+            interaction.OnPhaseChanged(phase);
+            interactionTools.Phase = phase;
+            string reminder = PlannerPrompts.CompletionReminder(phase);
+            while (true)
+            {
+                string summary = await AwaitCompletionAsync(session, prompt, interactionTools.TakePhaseSummary, reminder, buffer, cancellationToken);
+                PlanReview review = await interaction.ReviewPhaseAsync(phase, summary, cancellationToken);
+                if (review.Approved)
+                {
+                    return;
+                }
+
+                prompt = PlannerPrompts.PhaseFeedback(phase, GetFeedback(review));
+            }
+        }
+
+        /// <summary>Sends <paramref name="prompt"/>, then reminds the agent until it signals completion through a tool (<paramref name="takeResult"/> returns non-null).</summary>
+        private async Task<T> AwaitCompletionAsync<T>(ILLMSession session, string prompt, Func<T?> takeResult, string reminder, MessageBuffer buffer, CancellationToken cancellationToken)
+            where T : class
         {
             await AskAsync(session, prompt, buffer, cancellationToken);
             for (int reminders = 0; ; reminders++)
             {
-                if (interactionTools.TakeSubmittedPlan() is { } plan)
+                if (takeResult() is { } result)
                 {
-                    return plan;
+                    return result;
                 }
 
-                if (reminders >= _options.MaxSubmitRetries)
+                if (reminders >= _options.MaxCompletionReminders)
                 {
-                    throw new InvalidOperationException($"The agent did not submit a valid plan after {reminders} reminder(s).");
+                    throw new InvalidOperationException($"The agent did not complete the phase after {reminders} reminder(s).");
                 }
 
-                await AskAsync(session, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
+                await AskAsync(session, reminder, buffer, cancellationToken);
             }
+        }
+
+        private static string GetFeedback(PlanReview review)
+        {
+            return string.IsNullOrWhiteSpace(review.Feedback) ? "Improve it." : review.Feedback;
         }
 
         private static async Task AskAsync(ILLMSession session, string prompt, MessageBuffer buffer, CancellationToken cancellationToken)
