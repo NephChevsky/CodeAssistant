@@ -15,7 +15,7 @@ The app asks for a GitHub token on start. Type `exit` to quit.
 `CodeAssistant.WebApp` is an ASP.NET Core app with a React front end (`ClientApp`), offering the chat modes and the feature planner. It only listens on `http://localhost:5080` and has no authentication. Requires Node.js.
 
 ```powershell
-dotnet user-secrets set ConnectionStrings:Copilot <github-token> --project CodeAssistant.WebApp
+dotnet user-secrets set ConnectionStrings:Copilot "YOUR_TOKEN" --project CodeAssistant.WebApp
 dotnet run --project CodeAssistant.WebApp
 ```
 

@@ -23,5 +23,8 @@ export function ensureStarted(): Promise<void> {
 /** Hub errors are prefixed with the invocation details; keep only the message. */
 export function errorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/^An unexpected error occurred invoking '[^']+' on the server\.\s*(HubException:\s*)?/, '');
+  return message
+    .replace(/^An unexpected error occurred invoking '[^']+' on the server\.\s*/, '')
+    .replace(/^An error occurred on the server while streaming results\.\s*/, '')
+    .replace(/^(HubException|InvalidOperationException):\s*/, '');
 }

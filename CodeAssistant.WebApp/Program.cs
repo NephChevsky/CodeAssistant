@@ -12,6 +12,13 @@ namespace CodeAssistant.WebApp
         public static void Main(string[] args)
         {
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+            if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Copilot")))
+            {
+                throw new InvalidOperationException(
+                    "No GitHub token configured. Run: dotnet user-secrets set ConnectionStrings:Copilot \"YOUR_TOKEN\" --project CodeAssistant.WebApp " +
+                    "(or set the ConnectionStrings__Copilot environment variable).");
+            }
+
             builder.Services.AddCopilotLib();
             builder.Services.AddCodeAssistantLib();
             builder.Services.AddSingleton<AssistantConnections>();
