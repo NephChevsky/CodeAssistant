@@ -83,6 +83,10 @@ function find(node, predicate) {
 
 const cost = (tree) => find(tree, (node) => typeof node.type === 'function' && node.type.name === 'SessionCost');
 const button = (tree, text) => find(tree, (node) => node.type === 'button' && node.props.children === text);
+const messageEntries = (tree) => {
+  const messages = find(tree, (node) => node.props?.className === 'messages');
+  return messages.props.children.flat().filter((node) => /^message message-(user|assistant|tool|error)$/.test(node?.props?.className ?? ''));
+};
 
 test('chat starts, updates and resets session cost without adding usage as text', async () => {
   const harness = createHarness();
@@ -94,15 +98,18 @@ test('chat starts, updates and resets session cost without adding usage as text'
   await button(tree, 'Send').props.onClick();
   tree = harness.render(ChatView);
   assert.equal(cost(tree)?.props.cost, 0);
+  assert.equal(messageEntries(tree).length, 1);
   harness.getStream().next({ kind: 'usage', text: '', sessionCost: 0.02 });
   tree = harness.render(ChatView);
   assert.equal(cost(tree)?.props.cost, 0.02);
+  assert.equal(messageEntries(tree).length, 1);
   assert.equal(find(tree, (node) => typeof node.type === 'function' && node.type.name === 'Markdown'), undefined);
   harness.getStream().next({ kind: 'text', text: 'Hi' });
   harness.getStream().next({ kind: 'usage', text: '', sessionCost: 0.05 });
   harness.getStream().next({ kind: 'text', text: '!' });
   tree = harness.render(ChatView);
   assert.equal(cost(tree)?.props.cost, 0.05);
+  assert.equal(messageEntries(tree).length, 2);
   assert.equal(find(tree, (node) => typeof node.type === 'function' && node.type.name === 'Markdown')?.props.text, 'Hi!');
   harness.getStream().next({ kind: 'usage', text: '', sessionCost: null });
   tree = harness.render(ChatView);
@@ -129,6 +136,9 @@ test('plan session cost updates, remains after all outcomes and resets on restar
   await button(tree, 'Start planning').props.onClick();
   tree = harness.render(PlanView);
   assert.equal(cost(tree)?.props.cost, 0);
+  const phaseRow = find(tree, (node) => node.props?.className === 'phase-row');
+  assert.ok(find(phaseRow, (node) => node.type === 'ol' && node.props.className === 'phases'));
+  assert.ok(cost(phaseRow));
   for (const [outcome, args] of [['PlanCompleted', [[]]], ['PlanFailed', ['example']], ['PlanCancelled', []]]) {
     harness.handlers.get('PlanUsage')(0.01, 0.03);
     tree = harness.render(PlanView);
