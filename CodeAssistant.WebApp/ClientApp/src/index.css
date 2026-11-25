@@ -166,6 +166,13 @@ main {
   flex-wrap: wrap;
 }
 
+.session-cost {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 .chat,
 .plan {
   display: flex;
@@ -250,8 +257,16 @@ main {
   gap: 10px;
 }
 
+.phase-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .phases {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   list-style: none;
   padding: 0;

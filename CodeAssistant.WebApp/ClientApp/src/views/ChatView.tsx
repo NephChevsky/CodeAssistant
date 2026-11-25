@@ -3,6 +3,7 @@ import type { ISubscription } from '@microsoft/signalr';
 import { connection, errorMessage } from '../hub';
 import type { ChatChunk } from '../types';
 import { Markdown } from '../components/Markdown';
+import { SessionCost } from '../components/SessionCost';
 import { defaultModelSettings, ModelPicker, type ModelSettings } from '../components/ModelPicker';
 
 type Entry = { id: number; role: 'user' | 'assistant' | 'tool' | 'error'; text: string };
@@ -13,6 +14,7 @@ export function ChatView({ connected }: { connected: boolean }) {
   const [productionMode, setProductionMode] = useState(true);
   const [settings, setSettings] = useState<ModelSettings>(defaultModelSettings);
   const [started, setStarted] = useState(false);
+  const [sessionCost, setSessionCost] = useState<number | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,6 +56,7 @@ export function ChatView({ connected }: { connected: boolean }) {
       try {
         await connection.invoke('StartChat', { productionMode, ...settings });
         setStarted(true);
+        setSessionCost(0);
       } catch (err) {
         append('error', errorMessage(err));
         setBusy(false);
@@ -62,7 +65,15 @@ export function ChatView({ connected }: { connected: boolean }) {
     }
 
     subscription.current = connection.stream<ChatChunk>('SendMessage', message).subscribe({
-      next: (chunk) => (chunk.kind === 'tool' ? append('tool', `${chunk.toolName}: ${chunk.text}`) : appendReply(chunk.text)),
+      next: (chunk) => {
+        if (chunk.kind === 'usage') {
+          setSessionCost(chunk.sessionCost ?? 0);
+        } else if (chunk.kind === 'tool') {
+          append('tool', `${chunk.toolName}: ${chunk.text}`);
+        } else {
+          appendReply(chunk.text);
+        }
+      },
       complete: () => {
         subscription.current = null;
         setBusy(false);
@@ -84,6 +95,7 @@ export function ChatView({ connected }: { connected: boolean }) {
   function newChat() {
     stop();
     setStarted(false);
+    setSessionCost(null);
     setEntries([]);
   }
 
@@ -101,6 +113,7 @@ export function ChatView({ connected }: { connected: boolean }) {
         <button onClick={newChat} disabled={!started && entries.length === 0}>
           New chat
         </button>
+        {sessionCost !== null && <SessionCost cost={sessionCost} />}
       </div>
       <div className="messages">
         {entries.length === 0 && <p className="hint">Ask anything. The assistant can read any file on this machine but cannot modify anything.</p>}

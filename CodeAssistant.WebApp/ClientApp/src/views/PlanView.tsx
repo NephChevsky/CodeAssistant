@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { connection, errorMessage } from '../hub';
 import type { PendingQuestion, PlanningPhase, RepositoryInfo, SavedPlan } from '../types';
 import { Markdown } from '../components/Markdown';
+import { SessionCost } from '../components/SessionCost';
 import { defaultPlanModelSettings, ModelPicker, type ModelSettings } from '../components/ModelPicker';
 
 type Entry =
@@ -28,6 +29,7 @@ export function PlanView({ connected }: { connected: boolean }) {
   const [description, setDescription] = useState('');
   const [settings, setSettings] = useState<ModelSettings>(defaultPlanModelSettings);
   const [status, setStatus] = useState<Status>('idle');
+  const [sessionCost, setSessionCost] = useState(0);
   const [phase, setPhase] = useState<PlanningPhase | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export function PlanView({ connected }: { connected: boolean }) {
 
     const handlers: [string, (...args: any[]) => void][] = [
       ['PlanPhase', (p: PlanningPhase) => setPhase(p)],
+      ['PlanUsage', (_responseCost: number, cost: number) => setSessionCost(cost)],
       ['PlanMessage', (markdown: string) => add({ id: nextId++, kind: 'message', markdown })],
       ['PlanTool', (name: string, summary: string) => add({ id: nextId++, kind: 'tool', name, summary })],
       ['PlanQuestion', (question: PendingQuestion) => add({ id: nextId++, kind: 'question', question })],
@@ -85,6 +88,7 @@ export function PlanView({ connected }: { connected: boolean }) {
     setError(null);
     setEntries([]);
     setPhase(null);
+    setSessionCost(0);
     setStatus('running');
     try {
       await connection.invoke('StartPlan', { description, repositoryRoot, ...settings });
@@ -153,13 +157,16 @@ export function PlanView({ connected }: { connected: boolean }) {
       </div>
 
       {status !== 'idle' && (
-        <ol className="phases">
-          {phases.map((p) => (
-            <li key={p} className={phase === p ? 'current' : phase && phases.indexOf(p) < phases.indexOf(phase) ? 'done' : ''}>
-              {p}
-            </li>
-          ))}
-        </ol>
+        <div className="phase-row">
+          <ol className="phases">
+            {phases.map((p) => (
+              <li key={p} className={phase === p ? 'current' : phase && phases.indexOf(p) < phases.indexOf(phase) ? 'done' : ''}>
+                {p}
+              </li>
+            ))}
+          </ol>
+          <SessionCost cost={sessionCost} />
+        </div>
       )}
 
       <div className="timeline">

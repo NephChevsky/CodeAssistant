@@ -1,7 +1,9 @@
 export type ChatChunk = {
-  kind: 'text' | 'tool';
+  kind: 'text' | 'tool' | 'usage';
   text: string;
   toolName?: string | null;
+  responseCost?: number | null;
+  sessionCost?: number | null;
 };
 
 export type PlanningPhase = 'discovery' | 'alignment' | 'design' | 'refinement' | 'completed';
