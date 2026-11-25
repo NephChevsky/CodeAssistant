@@ -3,6 +3,7 @@ using CodeAssistant.Lib.Models;
 using CodeAssistant.Lib.Rendering;
 using CodeAssistant.Lib.Tools;
 using LLMLib;
+using LLMLib.DTO;
 using Microsoft.Extensions.AI;
 
 namespace CodeAssistant.Lib.Planning
@@ -57,7 +58,7 @@ namespace CodeAssistant.Lib.Planning
 
             interaction.OnPhaseChanged(PlanningPhase.Design);
             interactionTools.Phase = PlanningPhase.Design;
-            List<FeaturePlan> plans = [.. await AwaitCompletionAsync(session, PlannerPrompts.Design(multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, buffer, cancellationToken)];
+            List<FeaturePlan> plans = [.. await AwaitCompletionAsync(session, PlannerPrompts.Design(multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, interaction, buffer, cancellationToken)];
 
             interaction.OnPhaseChanged(PlanningPhase.Refinement);
             interactionTools.Phase = PlanningPhase.Refinement;
@@ -71,7 +72,7 @@ namespace CodeAssistant.Lib.Planning
                     break;
                 }
 
-                IReadOnlyList<FeaturePlan> revised = await AwaitCompletionAsync(session, PlannerPrompts.Revision(GetFeedback(review), multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
+                IReadOnlyList<FeaturePlan> revised = await AwaitCompletionAsync(session, PlannerPrompts.Revision(GetFeedback(review), multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, interaction, buffer, cancellationToken);
                 foreach (FeaturePlan plan in revised)
                 {
                     int index = plans.FindIndex(p => string.Equals(p.RepositoryRoot, plan.RepositoryRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
@@ -153,7 +154,7 @@ namespace CodeAssistant.Lib.Planning
             string reminder = PlannerPrompts.CompletionReminder(phase);
             while (true)
             {
-                string summary = await AwaitCompletionAsync(session, prompt, interactionTools.TakePhaseSummary, reminder, buffer, cancellationToken);
+                string summary = await AwaitCompletionAsync(session, prompt, interactionTools.TakePhaseSummary, reminder, interaction, buffer, cancellationToken);
                 PlanReview review = await interaction.ReviewPhaseAsync(phase, summary, cancellationToken);
                 if (review.Approved)
                 {
@@ -165,10 +166,10 @@ namespace CodeAssistant.Lib.Planning
         }
 
         /// <summary>Sends <paramref name="prompt"/>, then reminds the agent until it signals completion through a tool (<paramref name="takeResult"/> returns non-null).</summary>
-        private async Task<T> AwaitCompletionAsync<T>(ILLMSession session, string prompt, Func<T?> takeResult, string reminder, MessageBuffer buffer, CancellationToken cancellationToken)
+        private async Task<T> AwaitCompletionAsync<T>(ILLMSession session, string prompt, Func<T?> takeResult, string reminder, IPlanningInteraction interaction, MessageBuffer buffer, CancellationToken cancellationToken)
             where T : class
         {
-            await AskAsync(session, prompt, buffer, cancellationToken);
+            await AskAsync(session, prompt, interaction, buffer, cancellationToken);
             for (int reminders = 0; ; reminders++)
             {
                 if (takeResult() is { } result)
@@ -181,7 +182,7 @@ namespace CodeAssistant.Lib.Planning
                     throw new InvalidOperationException($"The agent did not complete the phase after {reminders} reminder(s).");
                 }
 
-                await AskAsync(session, reminder, buffer, cancellationToken);
+                await AskAsync(session, reminder, interaction, buffer, cancellationToken);
             }
         }
 
@@ -190,11 +191,19 @@ namespace CodeAssistant.Lib.Planning
             return string.IsNullOrWhiteSpace(review.Feedback) ? "Improve it." : review.Feedback;
         }
 
-        private static async Task AskAsync(ILLMSession session, string prompt, MessageBuffer buffer, CancellationToken cancellationToken)
+        private static async Task AskAsync(ILLMSession session, string prompt, IPlanningInteraction interaction, MessageBuffer buffer, CancellationToken cancellationToken)
         {
-            await foreach (string chunk in session.AskStreamingAsync(prompt, cancellationToken: cancellationToken))
+            await foreach (LLMStreamItem item in session.AskStreamingAsync(prompt, cancellationToken: cancellationToken))
             {
-                buffer.Append(chunk);
+                switch (item)
+                {
+                    case LLMTextChunk t:
+                        buffer.Append(t.Text);
+                        break;
+                    case LLMUsageUpdate u:
+                        interaction.OnUsage(u.ResponseCost, u.SessionCost);
+                        break;
+                }
             }
 
             buffer.Flush();

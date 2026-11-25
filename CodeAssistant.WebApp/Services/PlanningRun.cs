@@ -43,6 +43,8 @@ namespace CodeAssistant.WebApp.Services
             Send("PlanMessage", markdown);
         }
 
+        public void OnUsage(decimal responseCost, decimal sessionCost) => Send("PlanUsage", responseCost, sessionCost);
+
         public void OnToolInvoked(string toolName, string summary)
         {
             Send("PlanTool", toolName, summary);

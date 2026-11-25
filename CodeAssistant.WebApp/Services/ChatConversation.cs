@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using CodeAssistant.Lib.Chat;
 using CodeAssistant.WebApp.Models;
 using LLMLib;
+using LLMLib.DTO;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CodeAssistant.WebApp.Services
@@ -66,9 +67,17 @@ namespace CodeAssistant.WebApp.Services
         {
             try
             {
-                await foreach (string text in _session.AskStreamingAsync(message, cancellationToken: cancellationToken))
+                await foreach (LLMStreamItem item in _session.AskStreamingAsync(message, cancellationToken: cancellationToken))
                 {
-                    writer.TryWrite(new ChatChunk(ChatChunkKind.Text, text));
+                    switch (item)
+                    {
+                        case LLMTextChunk t:
+                            writer.TryWrite(new ChatChunk(ChatChunkKind.Text, t.Text));
+                            break;
+                        case LLMUsageUpdate u:
+                            writer.TryWrite(new ChatChunk(ChatChunkKind.Usage, string.Empty, null, u.ResponseCost, u.SessionCost));
+                            break;
+                    }
                 }
 
                 writer.TryComplete();

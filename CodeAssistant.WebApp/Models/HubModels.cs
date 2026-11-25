@@ -8,10 +8,11 @@ namespace CodeAssistant.WebApp.Models
     {
         Text,
         Tool,
+        Usage,
     }
 
-    /// <summary>A piece of a streamed chat reply: assistant text, or a tool call summary (<see cref="ToolName"/> set).</summary>
-    public sealed record ChatChunk(ChatChunkKind Kind, string Text, string? ToolName = null);
+    /// <summary>A piece of a streamed chat reply: assistant text, a tool call summary (<see cref="ToolName"/> set), or a usage update with empty text and costs in US dollars.</summary>
+    public sealed record ChatChunk(ChatChunkKind Kind, string Text, string? ToolName = null, decimal? ResponseCost = null, decimal? SessionCost = null);
 
     public sealed record PendingQuestion(string Id, string Question, IReadOnlyList<string> Choices, bool AllowFreeform);
 

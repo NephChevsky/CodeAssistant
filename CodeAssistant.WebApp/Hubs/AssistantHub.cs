@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.SignalR;
 namespace CodeAssistant.WebApp.Hubs
 {
     /// <summary>
-    /// Chat: <see cref="StartChat"/> then <see cref="SendMessage"/> (streamed).
+    /// Chat: <see cref="StartChat"/> then <see cref="SendMessage"/> (streamed text, tool, and usage chunks).
     /// Planning: <see cref="StartPlan"/>, then answer the PlanQuestion events and the PhaseReview / PlanReview events (with <see cref="ReviewPlan"/>)
-    /// until PlanCompleted, PlanFailed or PlanCancelled.
+    /// PlanUsage events report current turn and session costs until PlanCompleted, PlanFailed or PlanCancelled.
     /// </summary>
     public sealed class AssistantHub : Hub
     {

@@ -10,6 +10,9 @@ namespace CodeAssistant.Lib.Planning
         /// <summary>A complete assistant message (markdown), delivered at the end of a turn or before a question.</summary>
         void OnAssistantMessage(string markdown);
 
+        /// <summary>The LLM session reported usage: cost of the current turn so far and of the whole planning session, in US dollars (AI credits / 100).</summary>
+        void OnUsage(decimal responseCost, decimal sessionCost);
+
         void OnToolInvoked(string toolName, string summary);
 
         Task<string> AskUserAsync(PlannerQuestion question, CancellationToken cancellationToken);

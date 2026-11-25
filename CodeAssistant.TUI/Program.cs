@@ -3,6 +3,7 @@ using BoxOfYellow.ConsoleMarkdownRenderer.Spectre;
 using CodeAssistant.Lib.Chat;
 using CopilotLib;
 using LLMLib;
+using LLMLib.DTO;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -185,11 +186,14 @@ namespace CodeAssistant.TUI
 
             try
             {
-                await foreach (string chunk in session.AskStreamingAsync(input, cancellationToken: cancellationToken))
+                await foreach (LLMStreamItem item in session.AskStreamingAsync(input, cancellationToken: cancellationToken))
                 {
-                    lock (pending)
+                    if (item is LLMTextChunk text)
                     {
-                        pending.Append(chunk);
+                        lock (pending)
+                        {
+                            pending.Append(text.Text);
+                        }
                     }
                 }
 
