@@ -326,8 +326,7 @@ main {
 }
 
 .plan-document {
-  max-height: 60vh;
-  overflow-y: auto;
+  overflow-y: visible;
   background: var(--panel);
   border-radius: 6px;
   padding: 0 12px;
