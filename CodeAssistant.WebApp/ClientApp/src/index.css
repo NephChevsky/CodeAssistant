@@ -264,6 +264,17 @@ main {
   flex-wrap: wrap;
 }
 
+.cancel-button {
+  margin-left: auto;
+  background: #f8c9c9;
+  border-color: #e59a9a;
+  color: #7a1f1f;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background: #f3b3b3;
+}
+
 .phases {
   display: flex;
   flex-wrap: wrap;

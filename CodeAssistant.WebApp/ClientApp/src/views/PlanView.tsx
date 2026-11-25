@@ -111,11 +111,6 @@ export function PlanView({ connected }: { connected: boolean }) {
 
   return (
     <div className="plan">
-      {running && (
-        <div className="toolbar">
-          <button onClick={cancel}>Cancel</button>
-        </div>
-      )}
       <div className="plan-form" hidden={running}>
         <label className="wide">
           Repository
@@ -166,6 +161,11 @@ export function PlanView({ connected }: { connected: boolean }) {
             ))}
           </ol>
           <SessionCost cost={sessionCost} />
+          {running && (
+            <button className="cancel-button" onClick={cancel}>
+              Cancel
+            </button>
+          )}
         </div>
       )}
 
