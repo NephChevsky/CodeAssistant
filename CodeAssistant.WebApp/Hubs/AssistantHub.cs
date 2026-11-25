@@ -78,7 +78,8 @@ namespace CodeAssistant.WebApp.Hubs
             string repositoryRoot = settings.RepositoryRoot?.Trim() ?? string.Empty;
 
             // No repository selected means multi-repository planning across the whole DevFolder.
-            if (repositoryRoot.Length == 0)
+            bool multiRepository = repositoryRoot.Length == 0;
+            if (multiRepository)
             {
                 repositoryRoot = devFolder?.Trim() ?? string.Empty;
             }
@@ -93,6 +94,7 @@ namespace CodeAssistant.WebApp.Hubs
             FeatureRequest request = new()
             {
                 Description = settings.Description.Trim(),
+                MultiRepository = multiRepository,
                 RepositoryRoot = Path.GetFullPath(repositoryRoot),
                 Model = settings.Model,
                 ReasoningEffort = settings.ReasoningEffort,

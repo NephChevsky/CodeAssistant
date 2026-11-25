@@ -11,7 +11,7 @@ namespace CodeAssistant.Lib.Planning
         /// <summary>Reasoning effort requested from the model (e.g. "low", "medium", "high"). Provider default when null.</summary>
         public string? ReasoningEffort { get; set; }
 
-        /// <summary>Directory where approved plans are written. Defaults to the root of the repository the plan applies to.</summary>
+        /// <summary>Directory where approved plans are written. Defaults to the <c>Plans</c> folder at the git root of the repository the plan applies to.</summary>
         public string? PlansOutputDirectory { get; set; }
 
         /// <summary>Directory names hidden from the planner's tools, at any depth.</summary>
@@ -30,7 +30,12 @@ namespace CodeAssistant.Lib.Planning
 
         internal string GetPlansOutputDirectory(string planRepositoryRoot)
         {
-            return Path.GetFullPath(PlansOutputDirectory ?? planRepositoryRoot);
+            if (PlansOutputDirectory is not null)
+            {
+                return Path.GetFullPath(PlansOutputDirectory);
+            }
+
+            return Path.Combine(GitRepository.FindRoot(planRepositoryRoot) ?? Path.GetFullPath(planRepositoryRoot), "Plans");
         }
     }
 }

@@ -219,6 +219,7 @@ main {
 
 .message-status-success {
   color: var(--success);
+  white-space: pre-wrap;
 }
 
 .message-status-info {

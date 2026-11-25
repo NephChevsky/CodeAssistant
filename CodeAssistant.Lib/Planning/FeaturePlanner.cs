@@ -31,8 +31,9 @@ namespace CodeAssistant.Lib.Planning
             ArgumentException.ThrowIfNullOrWhiteSpace(request.Description);
 
             RepositorySandbox sandbox = new(request.RepositoryRoot ?? _options.RepositoryRoot, _options.ExcludedDirectories);
+            bool multiRepository = request.MultiRepository && sandbox.Root is not null;
             MessageBuffer buffer = new(interaction);
-            PlannerInteractionTools interactionTools = new(interaction, sandbox, buffer.Flush, cancellationToken);
+            PlannerInteractionTools interactionTools = new(interaction, sandbox, buffer.Flush, cancellationToken, multiRepository);
             List<AIFunction> tools =
             [
                 .. ReadOnlyRepositoryTools.Create(sandbox, _options, (name, summary) =>
@@ -45,7 +46,7 @@ namespace CodeAssistant.Lib.Planning
 
             await using ILLMSession session = await _llm.CreateSessionAsync(new LLMSessionOptions
             {
-                SystemMessage = PlannerPrompts.SystemMessage(sandbox.Root is not null),
+                SystemMessage = PlannerPrompts.SystemMessage(sandbox.Root is not null, multiRepository),
                 Model = request.Model ?? _options.Model,
                 ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                 Tools = tools,
@@ -56,30 +57,47 @@ namespace CodeAssistant.Lib.Planning
 
             interaction.OnPhaseChanged(PlanningPhase.Design);
             interactionTools.Phase = PlanningPhase.Design;
-            FeaturePlan plan = await AwaitCompletionAsync(session, PlannerPrompts.Design, interactionTools.TakeSubmittedPlan, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
+            List<FeaturePlan> plans = [.. await AwaitCompletionAsync(session, PlannerPrompts.Design(multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, buffer, cancellationToken)];
 
             interaction.OnPhaseChanged(PlanningPhase.Refinement);
             interactionTools.Phase = PlanningPhase.Refinement;
             string markdown;
             while (true)
             {
-                markdown = FeaturePlanMarkdownRenderer.Render(plan);
-                PlanReview review = await interaction.ReviewPlanAsync(plan, markdown, cancellationToken);
+                markdown = string.Join("\n\n---\n\n", plans.Select(FeaturePlanMarkdownRenderer.Render));
+                PlanReview review = await interaction.ReviewPlanAsync(plans, markdown, cancellationToken);
                 if (review.Approved)
                 {
                     break;
                 }
 
-                plan = await AwaitCompletionAsync(session, PlannerPrompts.Revision(GetFeedback(review)), interactionTools.TakeSubmittedPlan, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
+                IReadOnlyList<FeaturePlan> revised = await AwaitCompletionAsync(session, PlannerPrompts.Revision(GetFeedback(review), multiRepository), interactionTools.TakeSubmittedPlans, PlannerPrompts.SubmitReminder, buffer, cancellationToken);
+                foreach (FeaturePlan plan in revised)
+                {
+                    int index = plans.FindIndex(p => string.Equals(p.RepositoryRoot, plan.RepositoryRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+                    if (index >= 0)
+                    {
+                        plans[index] = plan;
+                    }
+                    else
+                    {
+                        plans.Add(plan);
+                    }
+                }
             }
 
-            (string markdownPath, string jsonPath) = GetPlanPaths(_options.GetPlansOutputDirectory(plan.RepositoryRoot), plan.Title, DateTime.Now);
-            Directory.CreateDirectory(Path.GetDirectoryName(markdownPath)!);
-            await File.WriteAllTextAsync(markdownPath, markdown, cancellationToken);
-            await File.WriteAllTextAsync(jsonPath, FeaturePlanJson.Serialize(plan), cancellationToken);
+            List<PlanFile> files = [];
+            foreach (FeaturePlan plan in plans)
+            {
+                (string markdownPath, string jsonPath) = GetPlanPaths(_options.GetPlansOutputDirectory(plan.RepositoryRoot), plan.Title, DateTime.Now);
+                Directory.CreateDirectory(Path.GetDirectoryName(markdownPath)!);
+                await File.WriteAllTextAsync(markdownPath, FeaturePlanMarkdownRenderer.Render(plan), cancellationToken);
+                await File.WriteAllTextAsync(jsonPath, FeaturePlanJson.Serialize(plan), cancellationToken);
+                files.Add(new PlanFile(plan, markdownPath, jsonPath));
+            }
 
             interaction.OnPhaseChanged(PlanningPhase.Completed);
-            return new FeaturePlanResult(plan, markdownPath, jsonPath, session.SessionId);
+            return new FeaturePlanResult(files, session.SessionId);
         }
 
         /// <summary>Builds unique <c>yyyyMMdd-slug.plan.md</c> / <c>.plan.json</c> paths that are guaranteed to be directly inside <paramref name="outputDirectory"/>.</summary>

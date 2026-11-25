@@ -69,7 +69,7 @@ namespace CodeAssistant.WebApp.Services
             return WaitForReviewAsync("PhaseReview", [phase, markdown], cancellationToken);
         }
 
-        public Task<PlanReview> ReviewPlanAsync(FeaturePlan plan, string markdown, CancellationToken cancellationToken)
+        public Task<PlanReview> ReviewPlanAsync(IReadOnlyList<FeaturePlan> plans, string markdown, CancellationToken cancellationToken)
         {
             return WaitForReviewAsync("PlanReview", [markdown], cancellationToken);
         }
@@ -122,7 +122,7 @@ namespace CodeAssistant.WebApp.Services
             try
             {
                 FeaturePlanResult result = await planner.PlanAsync(request, this, _cancellation.Token);
-                Send("PlanCompleted", new SavedPlan(result.MarkdownPath, result.JsonPath));
+                Send("PlanCompleted", result.Plans.Select(p => new SavedPlan(p.MarkdownPath, p.JsonPath)).ToList());
             }
             catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
             {

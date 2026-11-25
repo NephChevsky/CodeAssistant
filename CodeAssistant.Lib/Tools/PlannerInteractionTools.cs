@@ -19,16 +19,20 @@ namespace CodeAssistant.Lib.Tools
         private readonly RepositorySandbox _sandbox;
         private readonly Action _flushMessages;
         private readonly CancellationToken _cancellationToken;
+        private readonly bool _multiRepository;
+        private readonly object _plansLock = new();
+        private List<FeaturePlan> _submittedPlans = [];
         private string? _phaseSummary;
-        private FeaturePlan? _submittedPlan;
 
         /// <param name="flushMessages">Invoked before a question or a tool event is shown, so pending assistant text is delivered first.</param>
-        public PlannerInteractionTools(IPlanningInteraction interaction, RepositorySandbox sandbox, Action flushMessages, CancellationToken cancellationToken)
+        /// <param name="multiRepository">When true, each submitted plan names its own git repository (repositoryRoot) inside the sandbox.</param>
+        public PlannerInteractionTools(IPlanningInteraction interaction, RepositorySandbox sandbox, Action flushMessages, CancellationToken cancellationToken, bool multiRepository = false)
         {
             _interaction = interaction;
             _sandbox = sandbox;
             _flushMessages = flushMessages;
             _cancellationToken = cancellationToken;
+            _multiRepository = multiRepository;
         }
 
         /// <summary>Current phase. Completion tools of other phases are rejected.</summary>
@@ -61,10 +65,20 @@ namespace CodeAssistant.Lib.Tools
             return Interlocked.Exchange(ref _phaseSummary, null);
         }
 
-        /// <summary>Returns the last valid plan submitted since the previous call, or null.</summary>
-        public FeaturePlan? TakeSubmittedPlan()
+        /// <summary>Returns the valid plans submitted since the previous call (one per repository, the last submission winning), or null when there are none.</summary>
+        public IReadOnlyList<FeaturePlan>? TakeSubmittedPlans()
         {
-            return Interlocked.Exchange(ref _submittedPlan, null);
+            lock (_plansLock)
+            {
+                if (_submittedPlans.Count == 0)
+                {
+                    return null;
+                }
+
+                List<FeaturePlan> plans = _submittedPlans;
+                _submittedPlans = [];
+                return plans;
+            }
         }
 
         public async Task<string> AskUserAsync(
@@ -130,19 +144,19 @@ namespace CodeAssistant.Lib.Tools
             return Accept(CompleteAlignmentName, markdown.ToString().Trim());
         }
 
-        public string SubmitPlan([Description("The complete plan.")] FeaturePlan plan)
+        public string SubmitPlan([Description("The complete plan. In multi-repository mode, one plan per repository, with repositoryRoot set to that repository's absolute path.")] FeaturePlan plan)
         {
             if (Phase is not (PlanningPhase.Design or PlanningPhase.Refinement))
             {
                 return RejectWrongPhase(SubmitPlanName);
             }
 
-            if (_sandbox.Root is not null)
+            if (_sandbox.Root is not null && !_multiRepository)
             {
                 plan.RepositoryRoot = _sandbox.Root;
             }
 
-            IReadOnlyList<string> errors = FeaturePlanValidator.Validate(plan, _sandbox);
+            IReadOnlyList<string> errors = FeaturePlanValidator.Validate(plan, _sandbox, _multiRepository);
             _flushMessages();
             _interaction.OnToolInvoked(SubmitPlanName, errors.Count == 0 ? "plan is valid" : $"{errors.Count} validation error(s)");
             if (errors.Count > 0)
@@ -150,8 +164,16 @@ namespace CodeAssistant.Lib.Tools
                 return $"The plan is invalid. Fix these errors and call {SubmitPlanName} again with the full plan:\n- " + string.Join("\n- ", errors);
             }
 
-            Volatile.Write(ref _submittedPlan, plan);
-            return "Plan accepted. Stop here and wait for the user's review.";
+            plan.RepositoryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(plan.RepositoryRoot));
+            lock (_plansLock)
+            {
+                _submittedPlans.RemoveAll(p => string.Equals(p.RepositoryRoot, plan.RepositoryRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+                _submittedPlans.Add(plan);
+            }
+
+            return _multiRepository
+                ? "Plan accepted. Submit the plans of the other affected repositories, then stop and wait for the user's review."
+                : "Plan accepted. Stop here and wait for the user's review.";
         }
 
         private static void AppendList(StringBuilder markdown, string title, IEnumerable<string> items)

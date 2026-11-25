@@ -17,6 +17,7 @@ namespace CodeAssistant.Lib.Planning
         /// <summary>The agent declared <paramref name="phase"/> (Discovery or Alignment) complete; the user approves moving on or sends it back with feedback.</summary>
         Task<PlanReview> ReviewPhaseAsync(PlanningPhase phase, string markdown, CancellationToken cancellationToken);
 
-        Task<PlanReview> ReviewPlanAsync(FeaturePlan plan, string markdown, CancellationToken cancellationToken);
+        /// <summary>The agent submitted its plan(s), one per repository (a single plan unless planning several repositories); <paramref name="markdown"/> renders them all.</summary>
+        Task<PlanReview> ReviewPlanAsync(IReadOnlyList<FeaturePlan> plans, string markdown, CancellationToken cancellationToken);
     }
 }

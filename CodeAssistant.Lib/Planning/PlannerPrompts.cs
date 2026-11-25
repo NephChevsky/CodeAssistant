@@ -5,7 +5,7 @@ namespace CodeAssistant.Lib.Planning
 {
     internal static class PlannerPrompts
     {
-        public static string SystemMessage(bool hasRepositoryRoot)
+        public static string SystemMessage(bool hasRepositoryRoot, bool multiRepository = false)
         {
             string scope = hasRepositoryRoot
                 ? "for the repository you are given access to"
@@ -16,6 +16,13 @@ namespace CodeAssistant.Lib.Planning
             string planPaths = hasRepositoryRoot
                 ? "Relevant files and task files use paths relative to the repository root"
                 : "Set repositoryRoot to the absolute path of the repository the plan applies to; relevant files and task files use paths relative to it";
+            if (multiRepository)
+            {
+                scope = "for the git repositories found in the folder you are given access to (each subfolder containing .git is a repository)";
+                paths = "Paths are relative to that folder, so they start with the repository's folder name.";
+                planPaths = "Write one plan per repository that needs changes; set each plan's repositoryRoot to the absolute path of that repository's root (the folder containing .git). " +
+                    "Relevant files and task files of a plan use paths relative to its own repository root. Mention work that depends on another repository's plan in the tasks' descriptions and dependencies";
+            }
 
             return
                 "You are a software planning agent. Your only job is to produce an implementation plan for a feature requested by the user, " +
@@ -66,17 +73,24 @@ namespace CodeAssistant.Lib.Planning
                 $"then call {PlannerInteractionTools.CompletionToolName(phase)} again with the full updated summary.";
         }
 
-        public const string Design =
-            $"Phase 3 - Design. Call {PlannerInteractionTools.SubmitPlanName} with the complete plan, following the plan rules. " +
-            "Do not print the plan as text.";
+        public static string Design(bool multiRepository)
+        {
+            return multiRepository
+                ? $"Phase 3 - Design. Call {PlannerInteractionTools.SubmitPlanName} once for each repository that needs changes, each with the complete plan of that repository, following the plan rules. " +
+                    "Do not print the plans as text."
+                : $"Phase 3 - Design. Call {PlannerInteractionTools.SubmitPlanName} with the complete plan, following the plan rules. Do not print the plan as text.";
+        }
 
         public const string SubmitReminder =
             $"You have not submitted a plan. Call {PlannerInteractionTools.SubmitPlanName} now with the complete plan.";
 
-        public static string Revision(string feedback)
+        public static string Revision(string feedback, bool multiRepository)
         {
+            string submit = multiRepository
+                ? $"call {PlannerInteractionTools.SubmitPlanName} with the full revised plan (not a diff) of each repository whose plan changes; plans you do not resubmit are kept as they are"
+                : $"call {PlannerInteractionTools.SubmitPlanName} with the full revised plan (not a diff)";
             return "Phase 4 - Refinement. The user reviewed the plan and requested changes:\n" + feedback + "\n\n" +
-                $"Explore further if needed, then call {PlannerInteractionTools.SubmitPlanName} with the full revised plan (not a diff).";
+                $"Explore further if needed, then {submit}.";
         }
     }
 }

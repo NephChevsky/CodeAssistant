@@ -68,7 +68,8 @@ export function PlanView({ connected }: { connected: boolean }) {
         add({ id: nextId++, kind: 'review', title: `${capitalize(p)} complete. Agree to move on?`, approveLabel: 'Continue', markdown })],
       ['PlanReview', (markdown: string) =>
         add({ id: nextId++, kind: 'review', title: 'Plan for review', approveLabel: 'Approve and save', markdown })],
-      ['PlanCompleted', (saved: SavedPlan) => finish('success', `Plan saved to ${saved.markdownPath} and ${saved.jsonPath}`)],
+      ['PlanCompleted', (saved: SavedPlan[]) =>
+        finish('success', `Saved ${saved.length} plan${saved.length === 1 ? '' : 's'}:\n${saved.map((s) => `${s.markdownPath} and ${s.jsonPath}`).join('\n')}`)],
       ['PlanFailed', (message: string) => finish('error', `Planning failed: ${message}`)],
       ['PlanCancelled', () => finish('info', 'Planning cancelled.')],
     ];

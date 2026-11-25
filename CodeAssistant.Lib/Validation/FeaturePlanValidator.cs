@@ -1,4 +1,5 @@
 using CodeAssistant.Lib.Models;
+using CodeAssistant.Lib.Planning;
 using CodeAssistant.Lib.Tools;
 
 namespace CodeAssistant.Lib.Validation
@@ -7,7 +8,8 @@ namespace CodeAssistant.Lib.Validation
     public static class FeaturePlanValidator
     {
         /// <param name="sandbox">When provided, modify/reference files must exist inside it.</param>
-        public static IReadOnlyList<string> Validate(FeaturePlan plan, RepositorySandbox? sandbox = null)
+        /// <param name="requirePlanRepositoryRoot">When true, the plan's own repositoryRoot must be the root of a git repository (even if the sandbox has a root).</param>
+        public static IReadOnlyList<string> Validate(FeaturePlan plan, RepositorySandbox? sandbox = null, bool requirePlanRepositoryRoot = false)
         {
             List<string> errors = [];
 
@@ -77,7 +79,7 @@ namespace CodeAssistant.Lib.Validation
                 }
             }
 
-            if (sandbox is not null && GetRepositoryRoot(plan, sandbox, errors) is { } root)
+            if (sandbox is not null && GetRepositoryRoot(plan, sandbox, requirePlanRepositoryRoot, errors) is { } root)
             {
                 foreach (RelevantFile file in plan.RelevantFiles.Where(f => f.Change is FileChangeKind.Modify or FileChangeKind.Reference))
                 {
@@ -95,10 +97,10 @@ namespace CodeAssistant.Lib.Validation
             return errors;
         }
 
-        /// <summary>The sandbox root when there is one, otherwise the plan's repositoryRoot when it is an accessible directory.</summary>
-        private static string? GetRepositoryRoot(FeaturePlan plan, RepositorySandbox sandbox, List<string> errors)
+        /// <summary>The sandbox root when there is one (unless the plan's own root is required), otherwise the plan's repositoryRoot when it is an accessible directory.</summary>
+        private static string? GetRepositoryRoot(FeaturePlan plan, RepositorySandbox sandbox, bool requirePlanRepositoryRoot, List<string> errors)
         {
-            if (sandbox.Root is not null)
+            if (sandbox.Root is not null && !requirePlanRepositoryRoot)
             {
                 return sandbox.Root;
             }
@@ -110,6 +112,12 @@ namespace CodeAssistant.Lib.Validation
                     string fullPath = sandbox.Resolve(plan.RepositoryRoot);
                     if (Directory.Exists(fullPath))
                     {
+                        if (requirePlanRepositoryRoot && !GitRepository.IsRoot(fullPath))
+                        {
+                            errors.Add($"repositoryRoot '{plan.RepositoryRoot}' must be the root of a git repository (the folder containing .git).");
+                            return null;
+                        }
+
                         return fullPath;
                     }
                 }
