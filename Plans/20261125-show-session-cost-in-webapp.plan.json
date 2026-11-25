@@ -1,0 +1,451 @@
+{
+  "title": "Show session cost in WebApp",
+  "repositoryRoot": "D:\\dev\\CodeAssistant",
+  "summary": "CodeAssistant moves to LLMLib 0.3.0 and CopilotLib 0.7.0, whose \u0060AskStreamingAsync\u0060 streams typed items: text chunks plus usage updates with the response and session cost in dollars. In the TUI and planner, text handling moves to the new text items. The planner also forwards usage through a new \u0060IPlanningInteraction.OnUsage\u0060 callback. In the web app, chat usage is sent as a new usage chunk on the \u0060SendMessage\u0060 stream and planning usage as a \u0060PlanUsage\u0060 hub event. The Chat and Plan views show \u0022Session cost: $X.XXXX\u0022, updated live and reset when a new chat or plan starts. A small test project covers the server-side mapping, and the README is updated.",
+  "findings": [
+    "CodeAssistant.Lib references \u0060Neph.GenericLibs.Net.LLMLib\u0060 0.2.0. CodeAssistant.WebApp and CodeAssistant.TUI reference \u0060Neph.GenericLibs.Net.CopilotLib\u0060 0.6.0. The packages restore from D:\\dev\\GenericLibs.Net\\local-nuget-feed (nuget.config).",
+    "Three callers of \u0060AskStreamingAsync\u0060 must handle the typed stream: TUI \u0060Program.StreamReplyAsync\u0060, WebApp \u0060ChatConversation.ProduceAsync\u0060 and Lib \u0060FeaturePlanner.AskAsync\u0060.",
+    "Chat uses the SignalR streaming method \u0060AssistantHub.SendMessage\u0060, which returns \u0060IAsyncEnumerable\u003CChatChunk\u003E\u0060. \u0060ChatChunkKind\u0060 is serialized in camelCase by \u0060JsonStringEnumConverter\u0060.",
+    "\u0060PlanningRun\u0060 (the only \u0060IPlanningInteraction\u0060 implementer) forwards callbacks as ordered hub events through \u0060Send(method, args)\u0060. PlanView registers handlers in a single \u0060useEffect\u0060 list.",
+    "In ChatView the toolbar holds Mode, ModelPicker and \u0022New chat\u0022. In PlanView the toolbar is only rendered while running, and the phase stepper is shown whenever status != idle.",
+    "The repository has no test projects. CodeAssistant.Lib.csproj already declares InternalsVisibleTo for CodeAssistant.Lib.Tests.",
+    "ClientApp is React 19 with Vite and TypeScript. It has no test runner; \u0060npm run build\u0060 type-checks it (\u0060tsc\u0060)."
+  ],
+  "phases": [
+    {
+      "name": "Upgrade libraries and adapt callers",
+      "goal": "Consume LLMLib 0.3.0 and CopilotLib 0.7.0 and adapt every \u0060AskStreamingAsync\u0060 caller to the typed stream.",
+      "tasks": [
+        {
+          "id": "T1.1",
+          "title": "Bump GenericLibs package references",
+          "description": "Prerequisite: the GenericLibs.Net plan task T3.2 must have packed LLMLib 0.3.0 and CopilotLib 0.7.0 into D:\\dev\\GenericLibs.Net\\local-nuget-feed.\n\nThen update the package references:\n- CodeAssistant.Lib.csproj: \u0060Neph.GenericLibs.Net.LLMLib\u0060 to 0.3.0.\n- CodeAssistant.WebApp.csproj and CodeAssistant.TUI.csproj: \u0060Neph.GenericLibs.Net.CopilotLib\u0060 to 0.7.0.\n\nRun \u0060dotnet restore CodeAssistant.slnx\u0060.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.Lib/CodeAssistant.Lib.csproj",
+            "CodeAssistant.WebApp/CodeAssistant.WebApp.csproj",
+            "CodeAssistant.TUI/CodeAssistant.TUI.csproj"
+          ],
+          "dependsOn": [],
+          "parallelWith": [],
+          "acceptanceCriterionIds": [
+            "AC-01"
+          ]
+        },
+        {
+          "id": "T1.2",
+          "title": "Adapt TUI to typed stream",
+          "description": "In \u0060Program.StreamReplyAsync\u0060, iterate \u0060IAsyncEnumerable\u003CLLMStreamItem\u003E\u0060:\n- For \u0060LLMTextChunk text\u0060, append \u0060text.Text\u0060 to \u0060pending\u0060 under the existing lock.\n- Ignore \u0060LLMUsageUpdate\u0060, since the user chose not to show cost in the TUI.\n\nAdd \u0060using LLMLib.DTO;\u0060. All other TUI behaviour stays unchanged.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.TUI/Program.cs"
+          ],
+          "dependsOn": [
+            "T1.1"
+          ],
+          "parallelWith": [
+            "T1.3"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-01"
+          ]
+        },
+        {
+          "id": "T1.3",
+          "title": "Forward planner usage through IPlanningInteraction",
+          "description": "1. IPlanningInteraction.cs: add \u0060void OnUsage(decimal responseCost, decimal sessionCost);\u0060 with the doc \u0022The LLM session reported usage: cost of the current turn so far and of the whole planning session, in US dollars (AI credits / 100).\u0022\n2. FeaturePlanner.cs: add an \u0060IPlanningInteraction interaction\u0060 parameter to \u0060AwaitCompletionAsync\u0060 and \u0060AskAsync\u0060, and pass it from \u0060PlanAsync\u0060 (Design and Refinement calls) and from \u0060RunPhaseAsync\u0060.\n3. In \u0060AskAsync\u0060, switch on each item:\n   - \u0060LLMTextChunk t\u0060: \u0060buffer.Append(t.Text)\u0060.\n   - \u0060LLMUsageUpdate u\u0060: \u0060interaction.OnUsage(u.ResponseCost, u.SessionCost)\u0060.\n   - Keep the final \u0060buffer.Flush()\u0060.\n\nAdd \u0060using LLMLib.DTO;\u0060.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.Lib/Planning/IPlanningInteraction.cs",
+            "CodeAssistant.Lib/Planning/FeaturePlanner.cs"
+          ],
+          "dependsOn": [
+            "T1.1"
+          ],
+          "parallelWith": [
+            "T1.2"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-01",
+            "AC-04"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WebApp server: send cost to clients",
+      "goal": "Send cost updates from the server to the browser for both chat and planning.",
+      "tasks": [
+        {
+          "id": "T2.1",
+          "title": "Add Usage chunk kind",
+          "description": "In Models/HubModels.cs:\n- Add \u0060Usage\u0060 to \u0060ChatChunkKind\u0060.\n- Extend \u0060ChatChunk\u0060 to \u0060ChatChunk(ChatChunkKind Kind, string Text, string? ToolName = null, decimal? ResponseCost = null, decimal? SessionCost = null)\u0060.\n- Update the XML summary: a usage chunk has empty \u0060Text\u0060 and carries the costs in US dollars.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/Models/HubModels.cs"
+          ],
+          "dependsOn": [
+            "T1.1"
+          ],
+          "parallelWith": [
+            "T2.3"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-02"
+          ]
+        },
+        {
+          "id": "T2.2",
+          "title": "Map usage updates in ChatConversation",
+          "description": "In \u0060ChatConversation.ProduceAsync\u0060, iterate the typed stream and map each item:\n- \u0060LLMTextChunk t\u0060 becomes \u0060new ChatChunk(ChatChunkKind.Text, t.Text)\u0060.\n- \u0060LLMUsageUpdate u\u0060 becomes \u0060new ChatChunk(ChatChunkKind.Usage, string.Empty, null, u.ResponseCost, u.SessionCost)\u0060.\n\nWrite them to the channel in the order received. Add \u0060using LLMLib.DTO;\u0060.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/Services/ChatConversation.cs"
+          ],
+          "dependsOn": [
+            "T2.1"
+          ],
+          "parallelWith": [],
+          "acceptanceCriterionIds": [
+            "AC-02"
+          ]
+        },
+        {
+          "id": "T2.3",
+          "title": "Emit PlanUsage hub event",
+          "description": "Implement \u0060public void OnUsage(decimal responseCost, decimal sessionCost) =\u003E Send(\u0022PlanUsage\u0022, responseCost, sessionCost);\u0060 in \u0060PlanningRun\u0060.\n\nIn AssistantHub.cs, update the class summary to mention the PlanUsage event and the usage chat chunks.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/Services/PlanningRun.cs",
+            "CodeAssistant.WebApp/Hubs/AssistantHub.cs"
+          ],
+          "dependsOn": [
+            "T1.3"
+          ],
+          "parallelWith": [
+            "T2.1"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-04"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "WebApp client: show session cost",
+      "goal": "Display the live session cost in the Chat and Plan views.",
+      "tasks": [
+        {
+          "id": "T3.1",
+          "title": "Client types and SessionCost component",
+          "description": "1. types.ts: change \u0060ChatChunk.kind\u0060 to \u0060\u0027text\u0027 | \u0027tool\u0027 | \u0027usage\u0027\u0060 and add the optional fields \u0060responseCost?: number | null\u0060 and \u0060sessionCost?: number | null\u0060.\n2. Create components/SessionCost.tsx exporting \u0060SessionCost({ cost }: { cost: number })\u0060. It renders \u0060\u003Cspan className=\u0022session-cost\u0022 title=\u0022AI credits / 100\u0022\u003ESession cost: ${\u0027$\u0027}{cost.toFixed(4)}\u003C/span\u003E\u0060.\n3. index.css: add a \u0060.session-cost\u0060 rule using the existing muted text colour, \u0060font-variant-numeric: tabular-nums\u0060, \u0060white-space: nowrap\u0060 and \u0060margin-left: auto\u0060, so it sits at the right of toolbars.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/ClientApp/src/types.ts",
+            "CodeAssistant.WebApp/ClientApp/src/components/SessionCost.tsx",
+            "CodeAssistant.WebApp/ClientApp/src/index.css"
+          ],
+          "dependsOn": [
+            "T2.1"
+          ],
+          "parallelWith": [],
+          "acceptanceCriterionIds": [
+            "AC-03",
+            "AC-04"
+          ]
+        },
+        {
+          "id": "T3.2",
+          "title": "Show session cost in ChatView",
+          "description": "In ChatView.tsx:\n- Add \u0060const [sessionCost, setSessionCost] = useState\u003Cnumber | null\u003E(null)\u0060.\n- After \u0060StartChat\u0060 succeeds, \u0060setSessionCost(0)\u0060.\n- In the stream\u0027s \u0060next\u0060 handler, handle \u0060chunk.kind === \u0027usage\u0027\u0060 by calling \u0060setSessionCost(chunk.sessionCost ?? 0)\u0060. Don\u0027t append an entry. Tool and text chunks stay as before.\n- In \u0060newChat()\u0060, \u0060setSessionCost(null)\u0060.\n- Render \u0060{sessionCost !== null \u0026\u0026 \u003CSessionCost cost={sessionCost} /\u003E}\u0060 at the end of the toolbar.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/ClientApp/src/views/ChatView.tsx"
+          ],
+          "dependsOn": [
+            "T3.1",
+            "T2.2"
+          ],
+          "parallelWith": [
+            "T3.3"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-03"
+          ]
+        },
+        {
+          "id": "T3.3",
+          "title": "Show session cost in PlanView",
+          "description": "In PlanView.tsx:\n- Add \u0060const [sessionCost, setSessionCost] = useState(0)\u0060.\n- Add the handler \u0060[\u0027PlanUsage\u0027, (_responseCost: number, cost: number) =\u003E setSessionCost(cost)]\u0060 to the handlers list.\n- Call \u0060setSessionCost(0)\u0060 in \u0060start()\u0060.\n- Render \u0060\u003CSessionCost cost={sessionCost} /\u003E\u0060 whenever \u0060status !== \u0027idle\u0027\u0060, in a row with the phase stepper (wrap \u0060\u003Col className=\u0022phases\u0022\u003E\u0060 and the cost in a flex container, with CSS in index.css if needed). This keeps it visible after completion, failure or cancellation.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp/ClientApp/src/views/PlanView.tsx",
+            "CodeAssistant.WebApp/ClientApp/src/index.css"
+          ],
+          "dependsOn": [
+            "T3.1",
+            "T2.3"
+          ],
+          "parallelWith": [
+            "T3.2"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-04"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tests and documentation",
+      "goal": "Automated coverage of the server-side mapping, plus updated documentation.",
+      "tasks": [
+        {
+          "id": "T4.1",
+          "title": "Add CodeAssistant.WebApp.Tests",
+          "description": "Create CodeAssistant.WebApp.Tests/CodeAssistant.WebApp.Tests.csproj:\n- net10.0, \u0060IsPackable=false\u0060, \u0060NoWarn GHCP001\u0060.\n- Packages \u0060Microsoft.NET.Test.Sdk\u0060, \u0060xunit\u0060 and \u0060xunit.runner.visualstudio\u0060, with explicit versions (this repository has no central package management).\n- A \u0060ProjectReference\u0060 to ../CodeAssistant.WebApp/CodeAssistant.WebApp.csproj.\n- Add it to CodeAssistant.slnx.\n\nChatConversationTests.cs:\n- Write a \u0060FakeLLMService\u0060/\u0060FakeLLMSession\u0060 that implement \u0060ILLMService\u0060/\u0060ILLMSession\u0060 and yield \u0060LLMTextChunk(\u0022Hi\u0022)\u0060, \u0060LLMUsageUpdate(0.02m, 0.05m)\u0060, \u0060LLMTextChunk(\u0022!\u0022)\u0060.\n- Call \u0060ChatConversation.CreateAsync(fake, new ChatSettings(true, null, null), ct)\u0060, then \u0060SendAsync(\u0022hello\u0022, ct)\u0060.\n- Assert the three chunks come back in order with the right kinds and values.\n\nPlanningRunTests.cs:\n- A fake \u0060IFeaturePlanner\u0060 calls \u0060interaction.OnUsage(0.01m, 0.03m)\u0060 and returns \u0060new FeaturePlanResult([], \u0022s\u0022)\u0060.\n- A recording fake \u0060IClientProxy\u0060 captures the \u0060SendCoreAsync\u0060 calls.\n- Run \u0060PlanningRun.Start(...)\u0060, then await \u0060DisposeAsync()\u0060 after the run completes (poll until \u0022PlanCompleted\u0022 is recorded).\n- Assert that (\u0022PlanUsage\u0022, 0.01, 0.03) was recorded before \u0022PlanCompleted\u0022.",
+          "status": "todo",
+          "files": [
+            "CodeAssistant.WebApp.Tests/CodeAssistant.WebApp.Tests.csproj",
+            "CodeAssistant.WebApp.Tests/ChatConversationTests.cs",
+            "CodeAssistant.WebApp.Tests/PlanningRunTests.cs",
+            "CodeAssistant.slnx"
+          ],
+          "dependsOn": [
+            "T2.2",
+            "T2.3"
+          ],
+          "parallelWith": [
+            "T4.2"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-02",
+            "AC-04"
+          ]
+        },
+        {
+          "id": "T4.2",
+          "title": "Document session cost in README",
+          "description": "In README.md, Web app section, add one sentence: the Chat and Plan views show the current session cost, updated live, in US dollars (GitHub AI credits / 100).",
+          "status": "todo",
+          "files": [
+            "README.md"
+          ],
+          "dependsOn": [],
+          "parallelWith": [
+            "T4.1"
+          ],
+          "acceptanceCriterionIds": [
+            "AC-05"
+          ]
+        }
+      ]
+    }
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC-01",
+      "description": "Given LLMLib 0.3.0 and CopilotLib 0.7.0 are in the local feed, when the CodeAssistant solution is built, then it compiles. The TUI still renders only the assistant\u0027s reply text and shows no cost.",
+      "tests": [
+        {
+          "id": "AT-01.1",
+          "kind": "integration",
+          "description": "Restore and build the whole solution.",
+          "howToRun": "dotnet build CodeAssistant.slnx",
+          "expectedResult": "The build succeeds with no errors."
+        },
+        {
+          "id": "AT-01.2",
+          "kind": "manual",
+          "description": "Run the TUI, ask a question, and check the output.",
+          "howToRun": "dotnet run --project CodeAssistant.TUI; enter a token, then ask \u0022hello\u0022",
+          "expectedResult": "The reply is rendered as before, as Markdown after \u0022Assistant\u003E\u0022, with no cost text and no stray item type names."
+        }
+      ]
+    },
+    {
+      "id": "AC-02",
+      "description": "Given a started chat, when the LLM session streams an \u0060LLMUsageUpdate\u0060, then the \u0060SendMessage\u0060 stream yields a \u0060ChatChunk\u0060 with kind usage and the update\u0027s \u0060responseCost\u0060 and \u0060sessionCost\u0060. Text and tool chunks are unchanged.",
+      "tests": [
+        {
+          "id": "AT-02.1",
+          "kind": "unit",
+          "description": "\u0060ChatConversationTests\u0060: a fake \u0060ILLMService\u0060 returns a fake session that yields \u0060LLMTextChunk(\u0022Hi\u0022)\u0060, \u0060LLMUsageUpdate(0.02, 0.05)\u0060, \u0060LLMTextChunk(\u0022!\u0022)\u0060.",
+          "howToRun": "dotnet test CodeAssistant.WebApp.Tests --filter FullyQualifiedName~ChatConversationTests",
+          "expectedResult": "\u0060SendAsync\u0060 yields Text \u0022Hi\u0022, then Usage (0.02, 0.05), then Text \u0022!\u0022, in that order."
+        }
+      ]
+    },
+    {
+      "id": "AC-03",
+      "description": "Given the Chat view, when a chat is running, then the toolbar shows \u0022Session cost: $X.XXXX\u0022. It updates every time a usage chunk arrives during the stream. When \u0022New chat\u0022 is clicked, it resets until the next chat starts at $0.0000.",
+      "tests": [
+        {
+          "id": "AT-03.1",
+          "kind": "manual",
+          "description": "Run the web app, open /chat, send two messages, then click \u0022New chat\u0022.",
+          "howToRun": "dotnet run --project CodeAssistant.WebApp, then use the browser at http://localhost:5173/chat",
+          "expectedResult": "The cost appears at $0.0000 after the first send and grows during and after each reply. The second reply\u0027s total is \u003E= the first. After \u0022New chat\u0022 the indicator disappears, then shows $0.0000 again on the next send."
+        }
+      ]
+    },
+    {
+      "id": "AC-04",
+      "description": "Given a feature plan is running, when the planner\u0027s LLM session reports usage, then the client receives a \u0060PlanUsage(responseCost, sessionCost)\u0060 hub event. The Plan view shows \u0022Session cost: $X.XXXX\u0022 next to the phase stepper, updated live. It stays visible after the plan completes, fails or is cancelled, and resets to $0.0000 when a new plan starts.",
+      "tests": [
+        {
+          "id": "AT-04.1",
+          "kind": "unit",
+          "description": "\u0060PlanningRunTests\u0060: a fake \u0060IFeaturePlanner\u0060 calls \u0060interaction.OnUsage(0.01m, 0.03m)\u0060 and then returns a result. A fake \u0060IClientProxy\u0060 records each \u0060SendCoreAsync\u0060 call.",
+          "howToRun": "dotnet test CodeAssistant.WebApp.Tests --filter FullyQualifiedName~PlanningRunTests",
+          "expectedResult": "The recorded calls include (\u0022PlanUsage\u0022, [0.01, 0.03]) before \u0022PlanCompleted\u0022."
+        },
+        {
+          "id": "AT-04.2",
+          "kind": "manual",
+          "description": "Start a plan in the web app, follow it through Discovery, then cancel it. Start a new plan.",
+          "howToRun": "dotnet run --project CodeAssistant.WebApp, then use http://localhost:5173/plan",
+          "expectedResult": "The cost increases during the agent\u0027s work and is still shown after \u0022Planning cancelled.\u0022 The new plan starts at $0.0000."
+        }
+      ]
+    },
+    {
+      "id": "AC-05",
+      "description": "Given the README, when a user reads the Web app section, then it states that the Chat and Plan views show the current session cost, in dollars, as AI credits / 100.",
+      "tests": [
+        {
+          "id": "AT-05.1",
+          "kind": "manual",
+          "description": "Review README.md.",
+          "howToRun": "Open README.md",
+          "expectedResult": "The Web app section contains the session cost sentence."
+        }
+      ]
+    }
+  ],
+  "relevantFiles": [
+    {
+      "path": "CodeAssistant.Lib/CodeAssistant.Lib.csproj",
+      "change": "modify",
+      "purpose": "LLMLib 0.3.0."
+    },
+    {
+      "path": "CodeAssistant.WebApp/CodeAssistant.WebApp.csproj",
+      "change": "modify",
+      "purpose": "CopilotLib 0.7.0."
+    },
+    {
+      "path": "CodeAssistant.TUI/CodeAssistant.TUI.csproj",
+      "change": "modify",
+      "purpose": "CopilotLib 0.7.0."
+    },
+    {
+      "path": "CodeAssistant.TUI/Program.cs",
+      "change": "modify",
+      "purpose": "Consumes text items only."
+    },
+    {
+      "path": "CodeAssistant.Lib/Planning/IPlanningInteraction.cs",
+      "change": "modify",
+      "purpose": "New \u0060OnUsage\u0060 callback."
+    },
+    {
+      "path": "CodeAssistant.Lib/Planning/FeaturePlanner.cs",
+      "change": "modify",
+      "purpose": "Handles typed items and forwards usage."
+    },
+    {
+      "path": "CodeAssistant.WebApp/Models/HubModels.cs",
+      "change": "modify",
+      "purpose": "Usage chunk kind and cost fields."
+    },
+    {
+      "path": "CodeAssistant.WebApp/Services/ChatConversation.cs",
+      "change": "modify",
+      "purpose": "Maps typed items to chat chunks."
+    },
+    {
+      "path": "CodeAssistant.WebApp/Services/PlanningRun.cs",
+      "change": "modify",
+      "purpose": "Emits the PlanUsage hub event."
+    },
+    {
+      "path": "CodeAssistant.WebApp/Hubs/AssistantHub.cs",
+      "change": "modify",
+      "purpose": "Documents the new events."
+    },
+    {
+      "path": "CodeAssistant.WebApp/ClientApp/src/types.ts",
+      "change": "modify",
+      "purpose": "Usage chunk typing."
+    },
+    {
+      "path": "CodeAssistant.WebApp/ClientApp/src/components/SessionCost.tsx",
+      "change": "create",
+      "purpose": "Shared cost display."
+    },
+    {
+      "path": "CodeAssistant.WebApp/ClientApp/src/index.css",
+      "change": "modify",
+      "purpose": "Cost styling."
+    },
+    {
+      "path": "CodeAssistant.WebApp/ClientApp/src/views/ChatView.tsx",
+      "change": "modify",
+      "purpose": "Shows the chat session cost."
+    },
+    {
+      "path": "CodeAssistant.WebApp/ClientApp/src/views/PlanView.tsx",
+      "change": "modify",
+      "purpose": "Shows the planning session cost."
+    },
+    {
+      "path": "CodeAssistant.WebApp.Tests/CodeAssistant.WebApp.Tests.csproj",
+      "change": "create",
+      "purpose": "New test project."
+    },
+    {
+      "path": "CodeAssistant.WebApp.Tests/ChatConversationTests.cs",
+      "change": "create",
+      "purpose": "Tests the usage chunk mapping."
+    },
+    {
+      "path": "CodeAssistant.WebApp.Tests/PlanningRunTests.cs",
+      "change": "create",
+      "purpose": "Tests the PlanUsage event."
+    },
+    {
+      "path": "CodeAssistant.slnx",
+      "change": "modify",
+      "purpose": "Registers the test project."
+    },
+    {
+      "path": "README.md",
+      "change": "modify",
+      "purpose": "Documents the cost display."
+    },
+    {
+      "path": "nuget.config",
+      "change": "reference",
+      "purpose": "Local feed from which the new library versions are restored."
+    }
+  ],
+  "decisions": [
+    "Session cost is shown in both the Chat and Plan views and updated on every usage event (the user chose this). Format: \u0022Session cost: $\u0022 followed by the amount with 4 decimals.",
+    "Chat cost travels in the existing \u0060SendMessage\u0060 stream, as a new kind \u0060ChatChunkKind.Usage\u0060 with nullable \u0060ResponseCost\u0060 and \u0060SessionCost\u0060 fields. Its order relative to the text is kept and no new hub method is needed.",
+    "Planning cost travels through a new \u0060IPlanningInteraction.OnUsage(responseCost, sessionCost)\u0060 callback, which \u0060PlanningRun\u0060 forwards as a \u0060PlanUsage\u0060 hub event, consistent with PlanPhase, PlanMessage and PlanTool.",
+    "The TUI is only adapted to the typed stream and shows no cost (the user chose this).",
+    "The web app creates new sessions only, so each displayed cost starts at $0 when a chat or plan starts.",
+    "A new CodeAssistant.WebApp.Tests xUnit project covers the server-side mapping. The UI is verified manually, because the ClientApp has no test tooling."
+  ],
+  "outOfScope": [
+    "Cost display in the TUI.",
+    "Per-message cost badges, cost history, and persisting costs across app restarts.",
+    "Budget limits or warnings.",
+    "The GenericLibs.Net library changes themselves, which are covered by the GenericLibs.Net plan."
+  ],
+  "furtherConsiderations": [
+    "Showing the cost of the last response (\u0060responseCost\u0060) next to each assistant message would be a small extension, since the data is already sent.",
+    "A planning session runs many turns. A per-phase cost breakdown could be added later if useful.",
+    "If the SDK only delivers usage after the turn ends, the cost updates once per turn rather than during the stream. This depends on the GenericLibs.Net task T2.1/T2.2."
+  ]
+}
