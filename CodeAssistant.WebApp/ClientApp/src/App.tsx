@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { connection, ensureStarted, errorMessage } from './hub';
 import { ChatView } from './views/ChatView';
 import { PlanView } from './views/PlanView';
 
-type Tab = 'chat' | 'plan';
 type Status = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('chat');
+  const { pathname } = useLocation();
   const [status, setStatus] = useState<Status>('connecting');
   // The server drops chats and plans with the connection; views are remounted on a new connection.
   const [epoch, setEpoch] = useState(0);
@@ -48,12 +48,12 @@ export function App() {
       <header className="app-header">
         <h1>CodeAssistant</h1>
         <nav>
-          <button className={tab === 'chat' ? 'tab active' : 'tab'} onClick={() => setTab('chat')}>
+          <NavLink to="/chat" className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
             Chat
-          </button>
-          <button className={tab === 'plan' ? 'tab active' : 'tab'} onClick={() => setTab('plan')}>
+          </NavLink>
+          <NavLink to="/plan" className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
             Plan feature
-          </button>
+          </NavLink>
         </nav>
         <span className={`status status-${status}`}>{status}</span>
         {status === 'disconnected' && <button onClick={reconnect}>Reconnect</button>}
@@ -67,10 +67,16 @@ export function App() {
         </div>
       )}
       <main>
-        <div className="view" hidden={tab !== 'chat'}>
+        {/* Both views stay mounted so a running chat or plan survives navigation; the routes only validate the path. */}
+        <Routes>
+          <Route path="/chat" element={null} />
+          <Route path="/plan" element={null} />
+          <Route path="*" element={<Navigate to="/chat" replace />} />
+        </Routes>
+        <div className="view" hidden={pathname !== '/chat'}>
           <ChatView key={`chat-${epoch}`} connected={connected} />
         </div>
-        <div className="view" hidden={tab !== 'plan'}>
+        <div className="view" hidden={pathname !== '/plan'}>
           <PlanView key={`plan-${epoch}`} connected={connected} />
         </div>
       </main>

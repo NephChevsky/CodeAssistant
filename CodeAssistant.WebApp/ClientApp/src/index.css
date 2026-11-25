@@ -112,9 +112,17 @@ label > textarea {
 }
 
 .tab {
-  border-color: transparent;
-  background: none;
+  display: block;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
   text-align: left;
+}
+
+.tab:hover {
+  background: var(--panel);
 }
 
 .tab.active {
