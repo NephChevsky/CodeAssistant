@@ -116,9 +116,7 @@ export function PlanView({ connected }: { connected: boolean }) {
           Repository
           {repositories.length > 0 ? (
             <select value={repositoryRoot} disabled={running} onChange={(e) => setRepositoryRoot(e.target.value)}>
-              <option value="" disabled>
-                Select a repository
-              </option>
+              <option value="">Multi-Repository</option>
               {repositories.map((r) => (
                 <option key={r.path} value={r.path}>
                   {r.name}
@@ -146,7 +144,7 @@ export function PlanView({ connected }: { connected: boolean }) {
         </label>
         <div className="toolbar">
           <ModelPicker value={settings} onChange={setSettings} disabled={running} />
-          <button className="primary" onClick={start} disabled={!connected || !repositoryRoot.trim() || !description.trim()}>
+          <button className="primary" onClick={start} disabled={!connected || (repositories.length === 0 && !repositoryRoot.trim()) || !description.trim()}>
             {status === 'finished' ? 'Plan again' : 'Start planning'}
           </button>
         </div>

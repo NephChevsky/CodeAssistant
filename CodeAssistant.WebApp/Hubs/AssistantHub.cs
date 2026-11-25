@@ -74,9 +74,18 @@ namespace CodeAssistant.WebApp.Hubs
                 throw new HubException("Describe the feature to plan.");
             }
 
-            if (string.IsNullOrWhiteSpace(settings.RepositoryRoot) || !Path.IsPathFullyQualified(settings.RepositoryRoot.Trim()) || !Directory.Exists(settings.RepositoryRoot.Trim()))
+            string? devFolder = _configuration["DevFolder"];
+            string repositoryRoot = settings.RepositoryRoot?.Trim() ?? string.Empty;
+
+            // No repository selected means multi-repository planning across the whole DevFolder.
+            if (repositoryRoot.Length == 0)
             {
-                throw new HubException($"Repository '{settings.RepositoryRoot}' is not the absolute path of an existing directory.");
+                repositoryRoot = devFolder?.Trim() ?? string.Empty;
+            }
+
+            if (repositoryRoot.Length == 0 || !Path.IsPathFullyQualified(repositoryRoot) || !Directory.Exists(repositoryRoot))
+            {
+                throw new HubException($"Repository '{repositoryRoot}' is not the absolute path of an existing directory.");
             }
 
             ConnectionState state = State;
@@ -84,7 +93,7 @@ namespace CodeAssistant.WebApp.Hubs
             FeatureRequest request = new()
             {
                 Description = settings.Description.Trim(),
-                RepositoryRoot = Path.GetFullPath(settings.RepositoryRoot.Trim()),
+                RepositoryRoot = Path.GetFullPath(repositoryRoot),
                 Model = settings.Model,
                 ReasoningEffort = settings.ReasoningEffort,
             };
