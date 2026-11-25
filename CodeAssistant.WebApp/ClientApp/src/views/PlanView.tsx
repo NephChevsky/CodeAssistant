@@ -106,7 +106,12 @@ export function PlanView({ connected }: { connected: boolean }) {
 
   return (
     <div className="plan">
-      <div className="plan-form">
+      {running && (
+        <div className="toolbar">
+          <button onClick={cancel}>Cancel</button>
+        </div>
+      )}
+      <div className="plan-form" hidden={running}>
         <label className="wide">
           Repository
           {repositories.length > 0 ? (
@@ -141,13 +146,9 @@ export function PlanView({ connected }: { connected: boolean }) {
         </label>
         <div className="toolbar">
           <ModelPicker value={settings} onChange={setSettings} disabled={running} />
-          {running ? (
-            <button onClick={cancel}>Cancel</button>
-          ) : (
-            <button className="primary" onClick={start} disabled={!connected || !repositoryRoot.trim() || !description.trim()}>
-              {status === 'finished' ? 'Plan again' : 'Start planning'}
-            </button>
-          )}
+          <button className="primary" onClick={start} disabled={!connected || !repositoryRoot.trim() || !description.trim()}>
+            {status === 'finished' ? 'Plan again' : 'Start planning'}
+          </button>
         </div>
         {error && <p className="error">{error}</p>}
       </div>
