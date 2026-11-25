@@ -80,17 +80,23 @@ label > textarea {
 }
 
 .app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'sidebar notice'
+    'sidebar main';
   height: 100vh;
 }
 
 .app-header {
+  grid-area: sidebar;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 16px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
 }
 
 .app-header h1 {
@@ -100,6 +106,7 @@ label > textarea {
 
 .app-header nav {
   display: flex;
+  flex-direction: column;
   gap: 4px;
   flex: 1;
 }
@@ -107,6 +114,7 @@ label > textarea {
 .tab {
   border-color: transparent;
   background: none;
+  text-align: left;
 }
 
 .tab.active {
@@ -128,13 +136,14 @@ label > textarea {
 }
 
 .notice {
+  grid-area: notice;
   padding: 8px 20px;
   background: #3a2f12;
   border-bottom: 1px solid var(--border);
 }
 
 main {
-  flex: 1;
+  grid-area: main;
   min-height: 0;
 }
 
