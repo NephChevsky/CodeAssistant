@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { connection, errorMessage } from '../hub';
 import type { PendingQuestion, PlanningPhase, RepositoryInfo, SavedPlan } from '../types';
 import { Markdown } from '../components/Markdown';
-import { defaultModelSettings, ModelPicker, type ModelSettings } from '../components/ModelPicker';
+import { defaultPlanModelSettings, ModelPicker, type ModelSettings } from '../components/ModelPicker';
 
 type Entry =
   | { id: number; kind: 'message'; markdown: string }
@@ -26,7 +26,7 @@ export function PlanView({ connected }: { connected: boolean }) {
   const [repositoryRoot, setRepositoryRoot] = useState(() => localStorage.getItem(repositoryKey) ?? '');
   const [repositories, setRepositories] = useState<RepositoryInfo[]>([]);
   const [description, setDescription] = useState('');
-  const [settings, setSettings] = useState<ModelSettings>(defaultModelSettings);
+  const [settings, setSettings] = useState<ModelSettings>(defaultPlanModelSettings);
   const [status, setStatus] = useState<Status>('idle');
   const [phase, setPhase] = useState<PlanningPhase | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);

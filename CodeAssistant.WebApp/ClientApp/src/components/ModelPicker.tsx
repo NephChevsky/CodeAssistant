@@ -7,6 +7,8 @@ export type ModelSettings = {
 
 export const defaultModelSettings: ModelSettings = { model: models[0], reasoningEffort: defaultReasoningEffort(models[0]) };
 
+export const defaultPlanModelSettings: ModelSettings = { model: 'claude-opus-5.5', reasoningEffort: 'high' };
+
 type Props = {
   value: ModelSettings;
   onChange: (value: ModelSettings) => void;
